@@ -167,7 +167,12 @@ elif seccion == "🧱 Materias Primas (ABM)":
                 mp_id = mp_dict[mp_sel]
                 datos = pd.read_sql_query("SELECT * FROM materias_primas WHERE id = ?", conn, params=(mp_id,)).iloc[0]
 
-                new_unidad = st.selectbox("Unidad", ["unidad", "g", "kg", "cc", "ml", "otro"], index=["unidad", "g", "kg", "cc", "ml", "otro"].index(datos["unidad"]), key="unidad_edit_abm")
+        
+        opciones_unidad = ["Mililitros", "Centímetros cúbicos", "Centímetros", "Gramos", "Unidad"]
+        unidad_actual = str(datos["unidad"]).strip()
+        index_unidad = opciones_unidad.index(unidad_actual) if unidad_actual in opciones_unidad else opciones_unidad.index("Unidad")
+        new_unidad = st.selectbox("Unidad", opciones_unidad, index=index_unidad, key="unidad_edit_abm")
+
                 new_precio = st.number_input("Precio por unidad", value=datos["precio_por_unidad"], step=0.01, key="precio_edit_abm")
 
                 col1, col2 = st.columns(2)
@@ -187,7 +192,7 @@ elif seccion == "🧱 Materias Primas (ABM)":
 
     st.subheader("Agregar nueva materia prima")
     nuevo_nombre = st.text_input("Nombre")
-    nueva_unidad = st.selectbox("Unidad nueva", ["unidad", "g", "kg", "cc", "ml", "otro"], key="unidad_new")
+    nueva_unidad = st.selectbox("Unidad nueva", ["Mililitros", "Centímetros cúbicos", "Centímetros", "Gramos", "Unidad"], key="unidad_new")
     nuevo_precio = st.number_input("Precio por unidad", min_value=0.0, step=0.01, key="precio_new")
     fecha_new = st.date_input("Fecha de actualización", key="fecha_new")
     cat_new = st.selectbox("Categoría nueva", cat_df["nombre"].tolist(), key="cat_new")
