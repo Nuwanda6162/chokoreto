@@ -2,6 +2,7 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
+from datetime import date
 
 # Conectar a la base SQLite
 conn = sqlite3.connect("chokoreto_costos.db", check_same_thread=False)
@@ -75,24 +76,50 @@ st.dataframe(materias_primas)
 # Editar materia prima existente
 st.header("✏️ Editar Materia Prima")
 
-mp_list = pd.read_sql_query("SELECT id, nombre FROM materias_primas ORDER BY nombre", conn)
-mp_dict = dict(zip(mp_list["nombre"], mp_list["id"]))
-mp_nombre_sel = st.selectbox("Seleccioná una materia prima para editar", list(mp_dict.keys()), key="editar_mp_sel")
-mp_id_sel = mp_dict[mp_nombre_sel]
+# Selección de categoría y subcategoría para filtrar
+cat_filtro = st.selectbox("Filtrar por Categoría", cat_options["nombre"].tolist(), key="cat_filtro_edit")
 
-mp_data = pd.read_sql_query("SELECT * FROM materias_primas WHERE id = ?", conn, params=(mp_id_sel,)).iloc[0]
+subcat_filtro_query = f"""
+SELECT sub.id, sub.nombre
+FROM subcategorias_mp sub
+JOIN categorias_mp cat ON sub.categoria_id = cat.id
+WHERE cat.nombre = ?
+"""
+subcats_filtradas = pd.read_sql_query(subcat_filtro_query, conn, params=(cat_filtro,))
+subcat_dict_filtro = dict(zip(subcats_filtradas["nombre"], subcats_filtradas["id"]))
 
-new_unidad = st.selectbox("Unidad (edición)", ["unidad", "g", "kg", "cc", "ml", "otro"], 
-                          index=["unidad", "g", "kg", "cc", "ml", "otro"].index(mp_data["unidad"]) if mp_data["unidad"] in ["unidad", "g", "kg", "cc", "ml", "otro"] else 0,
-                          key="unidad_edicion")
-new_precio = st.number_input("Precio por unidad (edición)", value=mp_data["precio_por_unidad"], step=0.01, key="precio_edicion")
-new_fecha = st.date_input("Fecha de actualización (edición)", pd.to_datetime(mp_data["fecha_actualizacion"]), key="fecha_edicion")
+if not subcat_dict_filtro:
+    st.warning("No hay subcategorías para esta categoría.")
+else:
+    subcat_sel_nombre = st.selectbox("Filtrar por Subcategoría", list(subcat_dict_filtro.keys()), key="subcat_filtro_edit")
+    subcat_sel_id = subcat_dict_filtro[subcat_sel_nombre]
 
-if st.button("Actualizar materia prima", key="actualizar_mp"):
-    cursor.execute("""
-        UPDATE materias_primas
-        SET unidad = ?, precio_por_unidad = ?, fecha_actualizacion = ?
-        WHERE id = ?
-    """, (new_unidad, new_precio, str(new_fecha), mp_id_sel))
-    conn.commit()
-    st.success("Materia prima actualizada correctamente")
+    # Filtrar materias primas por subcategoría seleccionada
+    mp_filtradas = pd.read_sql_query(
+        "SELECT id, nombre FROM materias_primas WHERE subcategoria_id = ? ORDER BY nombre",
+        conn, params=(subcat_sel_id,)
+    )
+
+    if mp_filtradas.empty:
+        st.info("No hay materias primas para esa subcategoría.")
+    else:
+        mp_dict = dict(zip(mp_filtradas["nombre"], mp_filtradas["id"]))
+        mp_nombre_sel = st.selectbox("Seleccioná una materia prima para editar", list(mp_dict.keys()), key="editar_mp_sel")
+        mp_id_sel = mp_dict[mp_nombre_sel]
+
+        mp_data = pd.read_sql_query("SELECT * FROM materias_primas WHERE id = ?", conn, params=(mp_id_sel,)).iloc[0]
+
+        new_unidad = st.selectbox("Unidad (edición)", ["unidad", "g", "kg", "cc", "ml", "otro"], 
+                                  index=["unidad", "g", "kg", "cc", "ml", "otro"].index(mp_data["unidad"]) if mp_data["unidad"] in ["unidad", "g", "kg", "cc", "ml", "otro"] else 0,
+                                  key="unidad_edicion")
+        new_precio = st.number_input("Precio por unidad (edición)", value=mp_data["precio_por_unidad"], step=0.01, key="precio_edicion")
+
+        if st.button("Actualizar materia prima", key="actualizar_mp"):
+            hoy = date.today()
+            cursor.execute("""
+                UPDATE materias_primas
+                SET unidad = ?, precio_por_unidad = ?, fecha_actualizacion = ?
+                WHERE id = ?
+            """, (new_unidad, new_precio, str(hoy), mp_id_sel))
+            conn.commit()
+            st.success("Materia prima actualizada correctamente")
