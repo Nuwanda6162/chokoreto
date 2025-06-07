@@ -169,21 +169,27 @@ elif seccion == "🧱 Materias Primas (ABM)":
 
         
 
+
         opciones_unidad = ["Mililitros", "Centímetros cúbicos", "Centímetros", "Gramos", "Unidad"]
         unidad_actual = str(datos["unidad"]).strip()
         index_unidad = opciones_unidad.index(unidad_actual) if unidad_actual in opciones_unidad else opciones_unidad.index("Unidad")
         new_unidad = st.selectbox("Unidad", opciones_unidad, index=index_unidad, key="unidad_edit_abm")
         new_precio = st.number_input("Precio por unidad", value=datos["precio_por_unidad"], step=0.01, key="precio_edit_abm")
 
-
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("Actualizar MP", key="btn_update_mp"):
-                        hoy = date.today()
-                        cursor.execute("UPDATE materias_primas SET unidad = ?, precio_por_unidad = ?, fecha_actualizacion = ? WHERE id = ?", (new_unidad, new_precio, str(hoy), mp_id))
-                        conn.commit()
-                        st.success("Materia prima actualizada")
-                        st.experimental_rerun()
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Actualizar MP", key="btn_update_mp"):
+                hoy = date.today()
+                cursor.execute("UPDATE materias_primas SET unidad = ?, precio_por_unidad = ?, fecha_actualizacion = ? WHERE id = ?", (new_unidad, new_precio, str(hoy), mp_id))
+                conn.commit()
+                st.success("Materia prima actualizada")
+                st.experimental_rerun()
+        with col2:
+            if st.button("Eliminar MP", key="btn_delete_mp"):
+                cursor.execute("DELETE FROM materias_primas WHERE id = ?", (mp_id,))
+                conn.commit()
+                st.success("Materia prima eliminada")
+                st.experimental_rerun()
                 with col2:
                     if st.button("Eliminar MP", key="btn_delete_mp"):
                         cursor.execute("DELETE FROM materias_primas WHERE id = ?", (mp_id,))
