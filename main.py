@@ -12,7 +12,9 @@ st.sidebar.title("Menú")
 seccion = st.sidebar.radio("Ir a:", [
     "📋 Ver Materias Primas",
     "➕ Cargar Materia Prima",
-    "✏️ Editar Materia Prima"
+    "✏️ Editar Materia Prima",
+    "🧪 Crear Producto",
+    "🍫 Agregar Ingredientes"
 ])
 
 cat_options = pd.read_sql_query("SELECT * FROM categorias_mp", conn)
@@ -72,16 +74,65 @@ elif seccion == "✏️ Editar Materia Prima":
                 mp_nombre_sel = st.selectbox("Seleccioná una materia prima", list(mp_dict.keys()), key="editar_mp_sel")
                 mp_id_sel = mp_dict[mp_nombre_sel]
                 mp_data = pd.read_sql_query("SELECT * FROM materias_primas WHERE id = ?", conn, params=(mp_id_sel,)).iloc[0]
-
                 opciones_unidad = ["unidad", "g", "kg", "cc", "ml", "otro"]
                 unidad_actual = str(mp_data["unidad"]).lower().strip()
                 index_unidad = opciones_unidad.index(unidad_actual) if unidad_actual in opciones_unidad else opciones_unidad.index("otro")
-
                 new_unidad = st.selectbox("Unidad (edición)", opciones_unidad, index=index_unidad, key="unidad_edicion")
                 new_precio = st.number_input("Precio por unidad (edición)", value=mp_data["precio_por_unidad"], step=0.01, key="precio_edicion")
-
                 if st.button("Actualizar materia prima", key="actualizar_mp"):
                     hoy = date.today()
                     cursor.execute("UPDATE materias_primas SET unidad = ?, precio_por_unidad = ?, fecha_actualizacion = ? WHERE id = ?", (new_unidad, new_precio, str(hoy), mp_id_sel))
                     conn.commit()
                     st.success("Materia prima actualizada correctamente")
+
+elif seccion == "🧪 Crear Producto":
+    st.title("🧪 Crear Producto")
+    categorias_prod = pd.read_sql_query("SELECT * FROM categoria_productos", conn)
+    prod_nombre = st.text_input("Nombre del producto")
+    categoria_prod = st.selectbox("Categoría del producto", categorias_prod["nombre"].tolist())
+    margen = st.number_input("Margen de ganancia", value=3.0, step=0.1)
+    if st.button("Crear Producto"):
+        categoria_id = categorias_prod[categorias_prod["nombre"] == categoria_prod]["id"].values[0]
+        cursor.execute("INSERT INTO productos (nombre, categoria_id, margen) VALUES (?, ?, ?)", (prod_nombre, categoria_id, margen))
+        conn.commit()
+        st.success("Producto creado correctamente.")
+
+elif seccion == "🍫 Agregar Ingredientes":
+    st.title("🍫 Agregar Ingredientes a Producto")
+    productos = pd.read_sql_query("SELECT id, nombre FROM productos", conn)
+    if not productos.empty:
+        prod_dict = dict(zip(productos["nombre"], productos["id"]))
+        prod_sel = st.selectbox("Seleccioná un producto", list(prod_dict.keys()))
+        prod_id = prod_dict[prod_sel]
+        cat_filtro = st.selectbox("Filtrar por Categoría", cat_options["nombre"].tolist(), key="cat_mp_filtro")
+        subcats = pd.read_sql_query("SELECT sub.id, sub.nombre FROM subcategorias_mp sub JOIN categorias_mp cat ON sub.categoria_id = cat.id WHERE cat.nombre = ?", conn, params=(cat_filtro,))
+        subcat_dict = dict(zip(subcats["nombre"], subcats["id"]))
+        if subcat_dict:
+            subcat_sel = st.selectbox("Subcategoría", list(subcat_dict.keys()), key="subcat_mp_filtro")
+            subcat_id = subcat_dict[subcat_sel]
+            materias = pd.read_sql_query("SELECT id, nombre FROM materias_primas WHERE subcategoria_id = ?", conn, params=(subcat_id,))
+            if not materias.empty:
+                mp_dict = dict(zip(materias["nombre"], materias["id"]))
+                mp_sel = st.selectbox("Materia Prima", list(mp_dict.keys()), key="mp_sel")
+                mp_id = mp_dict[mp_sel]
+                cantidad = st.number_input("Cantidad utilizada", min_value=0.0, step=1.0)
+                if st.button("Agregar Ingrediente"):
+                    cursor.execute("INSERT INTO ingredientes_producto (producto_id, materia_prima_id, cantidad_usada) VALUES (?, ?, ?)", (prod_id, mp_id, cantidad))
+                    conn.commit()
+                    st.success("Ingrediente agregado.")
+
+        st.subheader("🧾 Ingredientes del producto")
+        resumen = pd.read_sql_query("""
+            SELECT mp.nombre AS materia_prima, ip.cantidad_usada, mp.precio_por_unidad,
+                   (ip.cantidad_usada * mp.precio_por_unidad) AS costo
+            FROM ingredientes_producto ip
+            JOIN materias_primas mp ON ip.materia_prima_id = mp.id
+            WHERE ip.producto_id = ?
+        """, conn, params=(prod_id,))
+        if not resumen.empty:
+            st.dataframe(resumen)
+            total = resumen["costo"].sum()
+            margen_base = pd.read_sql_query("SELECT margen FROM productos WHERE id = ?", conn, params=(prod_id,)).iloc[0]["margen"]
+            margen_actual = st.number_input("Simular margen", value=margen_base, step=0.1, key="sim_margen")
+            st.markdown(f"**Costo total:** ${total:.2f}")
+            st.markdown(f"**Precio sugerido:** ${total * margen_actual:.2f}")
