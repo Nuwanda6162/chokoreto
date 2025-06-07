@@ -71,3 +71,26 @@ LEFT JOIN categorias_mp cat ON sub.categoria_id = cat.id
 """
 materias_primas = pd.read_sql_query(query_mp, conn)
 st.dataframe(materias_primas)
+
+# Editar materia prima existente
+st.header("✏️ Editar Materia Prima")
+
+mp_list = pd.read_sql_query("SELECT id, nombre FROM materias_primas ORDER BY nombre", conn)
+mp_dict = dict(zip(mp_list["nombre"], mp_list["id"]))
+mp_nombre_sel = st.selectbox("Seleccioná una materia prima para editar", list(mp_dict.keys()))
+mp_id_sel = mp_dict[mp_nombre_sel]
+
+mp_data = pd.read_sql_query("SELECT * FROM materias_primas WHERE id = ?", conn, params=(mp_id_sel,)).iloc[0]
+
+new_unidad = st.selectbox("Unidad", ["unidad", "g", "kg", "cc", "ml", "otro"], index=["unidad", "g", "kg", "cc", "ml", "otro"].index(mp_data["unidad"]) if mp_data["unidad"] in ["unidad", "g", "kg", "cc", "ml", "otro"] else 0)
+new_precio = st.number_input("Precio por unidad", value=mp_data["precio_por_unidad"], step=0.01)
+new_fecha = st.date_input("Fecha de actualización", pd.to_datetime(mp_data["fecha_actualizacion"]))
+
+if st.button("Actualizar materia prima"):
+    cursor.execute("""
+        UPDATE materias_primas
+        SET unidad = ?, precio_por_unidad = ?, fecha_actualizacion = ?
+        WHERE id = ?
+    """, (new_unidad, new_precio, str(new_fecha), mp_id_sel))
+    conn.commit()
+    st.success("Materia prima actualizada correctamente")
