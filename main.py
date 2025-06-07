@@ -13,9 +13,9 @@ seccion = st.sidebar.radio("Ir a:", [
     "📋 Ver Materias Primas",
     "➕ Cargar Materia Prima",
     "✏️ Editar Materia Prima",
+    "🧱 Materias Primas (ABM)",
     "🧪 Crear Producto",
-    "🍫 Agregar Ingredientes",
-    "⚙️ Categorías de Productos"
+    "🍫 Agregar Ingredientes"
 ])
 
 cat_options = pd.read_sql_query("SELECT * FROM categorias_mp", conn)
@@ -138,39 +138,69 @@ elif seccion == "🍫 Agregar Ingredientes":
             st.markdown(f"**Costo total:** ${total:.2f}")
             st.markdown(f"**Precio sugerido:** ${total * margen_actual:.2f}")
 
-elif seccion == "⚙️ Categorías de Productos":
-    st.title("⚙️ Categorías de Productos")
+elif seccion == "🧱 Materias Primas (ABM)":
+    st.title("🧱 Materias Primas – Alta, Baja y Modificación")
 
-    st.subheader("Listado actual")
-    categorias_df = pd.read_sql_query("SELECT * FROM categoria_productos", conn)
-    st.dataframe(categorias_df)
+    st.subheader("Filtrar y ver materias primas")
+    cat_df = pd.read_sql_query("SELECT * FROM categorias_mp", conn)
+    if not cat_df.empty:
+        cat_sel = st.selectbox("Categoría", cat_df["nombre"].tolist(), key="cat_mp_abm")
+        sub_df = pd.read_sql_query(
+            "SELECT sub.id, sub.nombre FROM subcategorias_mp sub JOIN categorias_mp cat ON sub.categoria_id = cat.id WHERE cat.nombre = ?",
+            conn, params=(cat_sel,))
+        sub_dict = dict(zip(sub_df["nombre"], sub_df["id"]))
+        if sub_dict:
+            sub_sel = st.selectbox("Subcategoría", list(sub_dict.keys()), key="subcat_mp_abm")
+            sub_id = sub_dict[sub_sel]
 
-    st.subheader("Agregar nueva categoría")
-    nueva_categoria = st.text_input("Nombre de la nueva categoría", key="nueva_categoria")
-    if st.button("Agregar", key="btn_agregar_categoria") and nueva_categoria:
-        cursor.execute("INSERT INTO categoria_productos (nombre) VALUES (?)", (nueva_categoria.strip(),))
-        conn.commit()
-        st.success("Categoría agregada correctamente")
-        st.experimental_rerun()
+            mp_df = pd.read_sql_query("""
+                SELECT mp.id, mp.nombre, mp.unidad, mp.precio_por_unidad, mp.fecha_actualizacion
+                FROM materias_primas mp
+                WHERE mp.subcategoria_id = ?
+            """, conn, params=(sub_id,))
+            if not mp_df.empty:
+                st.dataframe(mp_df)
 
-    st.subheader("Editar o eliminar categoría existente")
-    categorias = pd.read_sql_query("SELECT * FROM categoria_productos", conn)
-    if not categorias.empty:
-        cat_dict = dict(zip(categorias["nombre"], categorias["id"]))
-        seleccion = st.selectbox("Seleccioná una categoría", list(cat_dict.keys()), key="select_edit")
-        id_sel = cat_dict[seleccion]
+                st.subheader("Editar o eliminar una materia prima")
+                mp_dict = dict(zip(mp_df["nombre"], mp_df["id"]))
+                mp_sel = st.selectbox("Seleccioná una MP", list(mp_dict.keys()), key="mp_sel_abm")
+                mp_id = mp_dict[mp_sel]
+                datos = pd.read_sql_query("SELECT * FROM materias_primas WHERE id = ?", conn, params=(mp_id,)).iloc[0]
 
-        nuevo_nombre = st.text_input("Nuevo nombre", value=seleccion, key="nuevo_nombre_cat")
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Actualizar nombre", key="btn_actualizar_cat") and nuevo_nombre:
-                cursor.execute("UPDATE categoria_productos SET nombre = ? WHERE id = ?", (nuevo_nombre.strip(), id_sel))
-                conn.commit()
-                st.success("Nombre actualizado correctamente")
-                st.experimental_rerun()
-        with col2:
-            if st.button("Eliminar categoría", key="btn_eliminar_cat"):
-                cursor.execute("DELETE FROM categoria_productos WHERE id = ?", (id_sel,))
-                conn.commit()
-                st.success("Categoría eliminada")
-                st.experimental_rerun()
+                new_unidad = st.selectbox("Unidad", ["unidad", "g", "kg", "cc", "ml", "otro"], index=["unidad", "g", "kg", "cc", "ml", "otro"].index(datos["unidad"]), key="unidad_edit_abm")
+                new_precio = st.number_input("Precio por unidad", value=datos["precio_por_unidad"], step=0.01, key="precio_edit_abm")
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("Actualizar MP", key="btn_update_mp"):
+                        hoy = date.today()
+                        cursor.execute("UPDATE materias_primas SET unidad = ?, precio_por_unidad = ?, fecha_actualizacion = ? WHERE id = ?", (new_unidad, new_precio, str(hoy), mp_id))
+                        conn.commit()
+                        st.success("Materia prima actualizada")
+                        st.experimental_rerun()
+                with col2:
+                    if st.button("Eliminar MP", key="btn_delete_mp"):
+                        cursor.execute("DELETE FROM materias_primas WHERE id = ?", (mp_id,))
+                        conn.commit()
+                        st.success("Materia prima eliminada")
+                        st.experimental_rerun()
+
+    st.subheader("Agregar nueva materia prima")
+    nuevo_nombre = st.text_input("Nombre")
+    nueva_unidad = st.selectbox("Unidad nueva", ["unidad", "g", "kg", "cc", "ml", "otro"], key="unidad_new")
+    nuevo_precio = st.number_input("Precio por unidad", min_value=0.0, step=0.01, key="precio_new")
+    fecha_new = st.date_input("Fecha de actualización", key="fecha_new")
+    cat_new = st.selectbox("Categoría nueva", cat_df["nombre"].tolist(), key="cat_new")
+    subcat_new_df = pd.read_sql_query(
+        "SELECT sub.id, sub.nombre FROM subcategorias_mp sub JOIN categorias_mp cat ON sub.categoria_id = cat.id WHERE cat.nombre = ?",
+        conn, params=(cat_new,))
+    subcat_new_dict = dict(zip(subcat_new_df["nombre"], subcat_new_df["id"]))
+    if subcat_new_dict:
+        subcat_new_sel = st.selectbox("Subcategoría nueva", list(subcat_new_dict.keys()), key="subcat_new")
+        subcat_new_id = subcat_new_dict[subcat_new_sel]
+        if st.button("Guardar nueva MP", key="guardar_new_mp") and nuevo_nombre:
+            cursor.execute("INSERT INTO materias_primas (nombre, unidad, precio_por_unidad, fecha_actualizacion, subcategoria_id) VALUES (?, ?, ?, ?, ?)",
+                           (nuevo_nombre.strip(), nueva_unidad, nuevo_precio, str(fecha_new), subcat_new_id))
+            conn.commit()
+            st.success("Materia prima guardada correctamente")
+            st.experimental_rerun()
