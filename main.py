@@ -14,7 +14,9 @@ seccion = st.sidebar.radio("Ir a:", [
     "➕ Cargar Materia Prima",
     "✏️ Editar Materia Prima",
     "🧱 Materias Primas (ABM)",
+    "🧱 Materias Primas (ABM)",
     "🧪 Crear Producto",
+    "⚙️ Categorías de Productos",
     "🍫 Agregar Ingredientes"
 ])
 
@@ -216,3 +218,40 @@ elif seccion == "🧱 Materias Primas (ABM)":
             conn.commit()
             st.success("Materia prima guardada correctamente")
             st.experimental_rerun()
+
+elif seccion == "⚙️ Categorías de Productos":
+    st.title("⚙️ Categorías de Productos")
+
+    st.subheader("Listado actual")
+    categorias_df = pd.read_sql_query("SELECT * FROM categoria_productos", conn)
+    st.dataframe(categorias_df)
+
+    st.subheader("Agregar nueva categoría")
+    nueva_categoria = st.text_input("Nombre de la nueva categoría", key="nueva_categoria")
+    if st.button("Agregar", key="btn_agregar_categoria") and nueva_categoria:
+        cursor.execute("INSERT INTO categoria_productos (nombre) VALUES (?)", (nueva_categoria.strip(),))
+        conn.commit()
+        st.success("Categoría agregada correctamente")
+        st.experimental_rerun()
+
+    st.subheader("Editar o eliminar categoría existente")
+    categorias = pd.read_sql_query("SELECT * FROM categoria_productos", conn)
+    if not categorias.empty:
+        cat_dict = dict(zip(categorias["nombre"], categorias["id"]))
+        seleccion = st.selectbox("Seleccioná una categoría", list(cat_dict.keys()), key="select_edit")
+        id_sel = cat_dict[seleccion]
+
+        nuevo_nombre = st.text_input("Nuevo nombre", value=seleccion, key="nuevo_nombre_cat")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Actualizar nombre", key="btn_actualizar_cat") and nuevo_nombre:
+                cursor.execute("UPDATE categoria_productos SET nombre = ? WHERE id = ?", (nuevo_nombre.strip(), id_sel))
+                conn.commit()
+                st.success("Nombre actualizado correctamente")
+                st.experimental_rerun()
+        with col2:
+            if st.button("Eliminar categoría", key="btn_eliminar_cat"):
+                cursor.execute("DELETE FROM categoria_productos WHERE id = ?", (id_sel,))
+                conn.commit()
+                st.success("Categoría eliminada")
+                st.experimental_rerun()
