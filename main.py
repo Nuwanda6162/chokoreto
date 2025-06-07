@@ -20,9 +20,44 @@ seccion = st.sidebar.radio("Ir a:", [
 
 cat_options = pd.read_sql_query("SELECT * FROM categorias_mp", conn)
 
-# --- OMITIDO: otras secciones previas por brevedad (quedan igual) ---
+if seccion == "📋 Ver Materias Primas":
+    st.title("📋 Materias Primas")
+    cat_filtro_tabla = st.selectbox("Filtrar por Categoría", cat_options["nombre"].tolist(), key="cat_filtro_tabla")
+    subcats_tabla = pd.read_sql_query("SELECT sub.id, sub.nombre FROM subcategorias_mp sub JOIN categorias_mp cat ON sub.categoria_id = cat.id WHERE cat.nombre = ?", conn, params=(cat_filtro_tabla,))
+    subcat_dict_tabla = dict(zip(subcats_tabla["nombre"], subcats_tabla["id"]))
+    if subcat_dict_tabla:
+        subcat_tabla_nombre = st.selectbox("Filtrar por Subcategoría", list(subcat_dict_tabla.keys()), key="subcat_filtro_tabla")
+        subcat_tabla_id = subcat_dict_tabla[subcat_tabla_nombre]
+        query_mp = """
+        SELECT mp.id, mp.nombre, mp.unidad, mp.precio_por_unidad, mp.fecha_actualizacion,
+               sub.nombre AS subcategoria, cat.nombre AS categoria
+        FROM materias_primas mp
+        LEFT JOIN subcategorias_mp sub ON mp.subcategoria_id = sub.id
+        LEFT JOIN categorias_mp cat ON sub.categoria_id = cat.id
+        WHERE sub.id = ?
+        """
+        materias_primas = pd.read_sql_query(query_mp, conn, params=(subcat_tabla_id,))
+        st.dataframe(materias_primas)
 
-# ✏️ Editar Materia Prima
+elif seccion == "➕ Cargar Materia Prima":
+    st.title("➕ Cargar nueva Materia Prima")
+    nombre = st.text_input("Nombre")
+    unidad = st.selectbox("Unidad", ["unidad", "g", "kg", "cc", "ml", "otro"], key="unidad_nueva")
+    precio = st.number_input("Precio por unidad", min_value=0.0, step=0.01, key="precio_nuevo")
+    fecha = st.date_input("Fecha de actualización", key="fecha_nueva")
+    selected_cat = st.selectbox("Categoría", cat_options["nombre"].tolist(), key="cat_nueva")
+    subcat_query = "SELECT sub.id, sub.nombre FROM subcategorias_mp sub JOIN categorias_mp cat ON sub.categoria_id = cat.id WHERE cat.nombre = ?"
+    filtered_subcats = pd.read_sql_query(subcat_query, conn, params=(selected_cat,))
+    subcat_dict = dict(zip(filtered_subcats["nombre"], filtered_subcats["id"]))
+    if not filtered_subcats.empty:
+        subcat_nombre = st.selectbox("Subcategoría", list(subcat_dict.keys()), key="subcat_nueva")
+        subcat_id = subcat_dict[subcat_nombre]
+        if st.button("Guardar", key="guardar_nueva") and nombre:
+            cursor.execute("INSERT INTO materias_primas (nombre, unidad, precio_por_unidad, fecha_actualizacion, subcategoria_id) VALUES (?, ?, ?, ?, ?)",
+                           (nombre, unidad, precio, str(fecha), subcat_id))
+            conn.commit()
+            st.success("Materia prima guardada correctamente")
+
 elif seccion == "✏️ Editar Materia Prima":
     st.title("✏️ Editar Materia Prima")
     cat_filtro = st.selectbox("Filtrar por Categoría", cat_options["nombre"].tolist(), key="cat_filtro_edit")
@@ -51,7 +86,3 @@ elif seccion == "✏️ Editar Materia Prima":
                 cursor.execute("UPDATE materias_primas SET unidad = ?, precio_por_unidad = ?, fecha_actualizacion = ? WHERE id = ?", (new_unidad, new_precio, str(hoy), mp_id_sel))
                 conn.commit()
                 st.success("Materia prima actualizada correctamente")
-        else:
-            st.info("No hay materias primas para esa subcategoría.")
-    else:
-        st.warning("No hay subcategorías para esta categoría.")
