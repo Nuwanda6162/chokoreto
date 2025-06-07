@@ -32,13 +32,30 @@ with st.form("form_mp"):
     unidad = st.selectbox("Unidad", ["unidad", "g", "kg", "cc", "ml", "otro"])
     precio = st.number_input("Precio por unidad", min_value=0.0, step=0.01)
     fecha = st.date_input("Fecha de actualización")
-    subcat_options = pd.read_sql_query("SELECT id, nombre FROM subcategorias_mp", conn)
-    subcat_dict = dict(zip(subcat_options["nombre"], subcat_options["id"]))
-    subcat_nombre = st.selectbox("Subcategoría", list(subcat_dict.keys()))
-    subcat_id = subcat_dict[subcat_nombre]
+
+    # Selector encadenado categoría → subcategoría
+    cat_options = pd.read_sql_query("SELECT * FROM categorias_mp", conn)
+    selected_cat = st.selectbox("Categoría", cat_options["nombre"].tolist())
+
+    subcat_query = f"""
+    SELECT sub.id, sub.nombre
+    FROM subcategorias_mp sub
+    JOIN categorias_mp cat ON sub.categoria_id = cat.id
+    WHERE cat.nombre = ?
+    """
+    filtered_subcats = pd.read_sql_query(subcat_query, conn, params=(selected_cat,))
+    subcat_dict = dict(zip(filtered_subcats["nombre"], filtered_subcats["id"]))
+
+    if filtered_subcats.empty:
+        st.warning("No hay subcategorías para esta categoría.")
+        subcat_id = None
+    else:
+        subcat_nombre = st.selectbox("Subcategoría", list(subcat_dict.keys()))
+        subcat_id = subcat_dict[subcat_nombre]
+
     submitted = st.form_submit_button("Guardar")
 
-    if submitted and nombre:
+    if submitted and nombre and subcat_id:
         cursor.execute("""
             INSERT INTO materias_primas (nombre, unidad, precio_por_unidad, fecha_actualizacion, subcategoria_id)
             VALUES (?, ?, ?, ?, ?)
