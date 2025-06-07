@@ -168,12 +168,13 @@ elif seccion == "🧱 Materias Primas (ABM)":
                 datos = pd.read_sql_query("SELECT * FROM materias_primas WHERE id = ?", conn, params=(mp_id,)).iloc[0]
 
         
+
         opciones_unidad = ["Mililitros", "Centímetros cúbicos", "Centímetros", "Gramos", "Unidad"]
         unidad_actual = str(datos["unidad"]).strip()
         index_unidad = opciones_unidad.index(unidad_actual) if unidad_actual in opciones_unidad else opciones_unidad.index("Unidad")
         new_unidad = st.selectbox("Unidad", opciones_unidad, index=index_unidad, key="unidad_edit_abm")
+        new_precio = st.number_input("Precio por unidad", value=datos["precio_por_unidad"], step=0.01, key="precio_edit_abm")
 
-                new_precio = st.number_input("Precio por unidad", value=datos["precio_por_unidad"], step=0.01, key="precio_edit_abm")
 
                 col1, col2 = st.columns(2)
                 with col1:
