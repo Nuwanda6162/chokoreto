@@ -60,23 +60,34 @@ if st.button("Guardar", key="guardar_nueva") and nombre and subcat_id:
     conn.commit()
     st.success("Materia prima guardada correctamente")
 
-# Mostrar materias primas
+# Mostrar materias primas con filtros
 st.header("📋 Materias Primas")
-query_mp = """
-SELECT mp.id, mp.nombre, mp.unidad, mp.precio_por_unidad, mp.fecha_actualizacion,
-       sub.nombre AS subcategoria,
-       cat.nombre AS categoria
-FROM materias_primas mp
-LEFT JOIN subcategorias_mp sub ON mp.subcategoria_id = sub.id
-LEFT JOIN categorias_mp cat ON sub.categoria_id = cat.id
-"""
-materias_primas = pd.read_sql_query(query_mp, conn)
-st.dataframe(materias_primas)
+
+cat_filtro_tabla = st.selectbox("Filtrar tabla por Categoría", cat_options["nombre"].tolist(), key="cat_filtro_tabla")
+subcats_tabla = pd.read_sql_query(subcat_query, conn, params=(cat_filtro_tabla,))
+subcat_dict_tabla = dict(zip(subcats_tabla["nombre"], subcats_tabla["id"]))
+
+if not subcat_dict_tabla:
+    st.info("No hay subcategorías para esta categoría.")
+else:
+    subcat_tabla_nombre = st.selectbox("Filtrar tabla por Subcategoría", list(subcat_dict_tabla.keys()), key="subcat_filtro_tabla")
+    subcat_tabla_id = subcat_dict_tabla[subcat_tabla_nombre]
+
+    query_mp = """
+    SELECT mp.id, mp.nombre, mp.unidad, mp.precio_por_unidad, mp.fecha_actualizacion,
+           sub.nombre AS subcategoria,
+           cat.nombre AS categoria
+    FROM materias_primas mp
+    LEFT JOIN subcategorias_mp sub ON mp.subcategoria_id = sub.id
+    LEFT JOIN categorias_mp cat ON sub.categoria_id = cat.id
+    WHERE sub.id = ?
+    """
+    materias_primas = pd.read_sql_query(query_mp, conn, params=(subcat_tabla_id,))
+    st.dataframe(materias_primas)
 
 # Editar materia prima existente
 st.header("✏️ Editar Materia Prima")
 
-# Selección de categoría y subcategoría para filtrar
 cat_filtro = st.selectbox("Filtrar por Categoría", cat_options["nombre"].tolist(), key="cat_filtro_edit")
 
 subcat_filtro_query = f"""
@@ -94,7 +105,6 @@ else:
     subcat_sel_nombre = st.selectbox("Filtrar por Subcategoría", list(subcat_dict_filtro.keys()), key="subcat_filtro_edit")
     subcat_sel_id = subcat_dict_filtro[subcat_sel_nombre]
 
-    # Filtrar materias primas por subcategoría seleccionada
     mp_filtradas = pd.read_sql_query(
         "SELECT id, nombre FROM materias_primas WHERE subcategoria_id = ? ORDER BY nombre",
         conn, params=(subcat_sel_id,)
