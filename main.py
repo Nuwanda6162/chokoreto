@@ -28,12 +28,12 @@ st.dataframe(subcategorias)
 st.header("➕ Cargar nueva Materia Prima")
 
 nombre = st.text_input("Nombre de la materia prima")
-unidad = st.selectbox("Unidad", ["unidad", "g", "kg", "cc", "ml", "otro"])
-precio = st.number_input("Precio por unidad", min_value=0.0, step=0.01)
-fecha = st.date_input("Fecha de actualización")
+unidad = st.selectbox("Unidad", ["unidad", "g", "kg", "cc", "ml", "otro"], key="unidad_nueva")
+precio = st.number_input("Precio por unidad", min_value=0.0, step=0.01, key="precio_nuevo")
+fecha = st.date_input("Fecha de actualización", key="fecha_nueva")
 
 cat_options = pd.read_sql_query("SELECT * FROM categorias_mp", conn)
-selected_cat = st.selectbox("Categoría", cat_options["nombre"].tolist())
+selected_cat = st.selectbox("Categoría", cat_options["nombre"].tolist(), key="cat_nueva")
 
 subcat_query = f"""
 SELECT sub.id, sub.nombre
@@ -48,10 +48,10 @@ if filtered_subcats.empty:
     st.warning("No hay subcategorías para esta categoría.")
     subcat_id = None
 else:
-    subcat_nombre = st.selectbox("Subcategoría", list(subcat_dict.keys()))
+    subcat_nombre = st.selectbox("Subcategoría", list(subcat_dict.keys()), key="subcat_nueva")
     subcat_id = subcat_dict[subcat_nombre]
 
-if st.button("Guardar") and nombre and subcat_id:
+if st.button("Guardar", key="guardar_nueva") and nombre and subcat_id:
     cursor.execute("""
         INSERT INTO materias_primas (nombre, unidad, precio_por_unidad, fecha_actualizacion, subcategoria_id)
         VALUES (?, ?, ?, ?, ?)
@@ -77,16 +77,18 @@ st.header("✏️ Editar Materia Prima")
 
 mp_list = pd.read_sql_query("SELECT id, nombre FROM materias_primas ORDER BY nombre", conn)
 mp_dict = dict(zip(mp_list["nombre"], mp_list["id"]))
-mp_nombre_sel = st.selectbox("Seleccioná una materia prima para editar", list(mp_dict.keys()))
+mp_nombre_sel = st.selectbox("Seleccioná una materia prima para editar", list(mp_dict.keys()), key="editar_mp_sel")
 mp_id_sel = mp_dict[mp_nombre_sel]
 
 mp_data = pd.read_sql_query("SELECT * FROM materias_primas WHERE id = ?", conn, params=(mp_id_sel,)).iloc[0]
 
-new_unidad = st.selectbox("Unidad", ["unidad", "g", "kg", "cc", "ml", "otro"], index=["unidad", "g", "kg", "cc", "ml", "otro"].index(mp_data["unidad"]) if mp_data["unidad"] in ["unidad", "g", "kg", "cc", "ml", "otro"] else 0)
-new_precio = st.number_input("Precio por unidad", value=mp_data["precio_por_unidad"], step=0.01)
-new_fecha = st.date_input("Fecha de actualización", pd.to_datetime(mp_data["fecha_actualizacion"]))
+new_unidad = st.selectbox("Unidad (edición)", ["unidad", "g", "kg", "cc", "ml", "otro"], 
+                          index=["unidad", "g", "kg", "cc", "ml", "otro"].index(mp_data["unidad"]) if mp_data["unidad"] in ["unidad", "g", "kg", "cc", "ml", "otro"] else 0,
+                          key="unidad_edicion")
+new_precio = st.number_input("Precio por unidad (edición)", value=mp_data["precio_por_unidad"], step=0.01, key="precio_edicion")
+new_fecha = st.date_input("Fecha de actualización (edición)", pd.to_datetime(mp_data["fecha_actualizacion"]), key="fecha_edicion")
 
-if st.button("Actualizar materia prima"):
+if st.button("Actualizar materia prima", key="actualizar_mp"):
     cursor.execute("""
         UPDATE materias_primas
         SET unidad = ?, precio_por_unidad = ?, fecha_actualizacion = ?
