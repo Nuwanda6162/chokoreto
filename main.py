@@ -294,29 +294,24 @@ elif seccion == "🧪 Producto (ABM)":
                     st.success("Producto eliminado")
                     st.rerun()
 
-    st.subheader("Agregar nuevo producto")
+        st.subheader("Agregar nuevo producto")
     nuevo_nombre = st.text_input("Nombre del nuevo producto", key="nuevo_prod_nombre")
     nueva_cat = st.selectbox("Categoría del nuevo producto", categorias_prod["nombre"].tolist(), key="nuevo_prod_cat")
     nueva_cat_id = categorias_prod[categorias_prod["nombre"] == nueva_cat]["id"].values[0]
 
-    subcats_nuevos = pd.read_sql_query("SELECT * FROM subcategorias_productos WHERE categoria_id = ?", conn, params=(nueva_cat_id,))
+    subcats_nuevos = pd.read_sql_query(
+        "SELECT * FROM subcategorias_productos WHERE categoria_id = ?", conn, params=(nueva_cat_id,)
+    )
     subcat_dict_nuevos = dict(zip(subcats_nuevos["nombre"], subcats_nuevos["id"]))
     if subcat_dict_nuevos:
         subcat_sel_nuevo = st.selectbox("Subcategoría del nuevo producto", list(subcat_dict_nuevos.keys()), key="nuevo_prod_subcat")
         nueva_subcat_id = subcat_dict_nuevos[subcat_sel_nuevo]
     else:
         nueva_subcat_id = None
-subcats_nuevos = pd.read_sql_query("SELECT * FROM subcategorias_productos WHERE categoria_id = ?", conn, params=(nueva_cat_id,))
-subcat_dict_nuevos = dict(zip(subcats_nuevos["nombre"], subcats_nuevos["id"]))
-if subcat_dict_nuevos:
-    subcat_sel_nuevo = st.selectbox("Subcategoría del nuevo producto", list(subcat_dict_nuevos.keys()), key="nuevo_prod_subcat")
-    nueva_subcat_id = subcat_dict_nuevos[subcat_sel_nuevo]
-else:
-    nueva_subcat_id = None
 
     nuevo_margen = st.number_input("Margen de ganancia", min_value=1.0, value=3.0, step=0.1, key="nuevo_prod_margen")
+
     if st.button("Crear Producto", key="crear_nuevo_prod"):
-        nueva_cat_id = categorias_prod[categorias_prod["nombre"] == nueva_cat]["id"].values[0]
         cursor.execute(
             "INSERT INTO productos (nombre, categoria_id, subcategoria_id, margen) VALUES (?, ?, ?, ?)",
             (nuevo_nombre.strip(), nueva_cat_id, nueva_subcat_id, nuevo_margen)
@@ -324,6 +319,7 @@ else:
         conn.commit()
         st.success("Producto creado correctamente")
         st.rerun()
+
 
 # 🍫 AGREGAR INGREDIENTES
 elif seccion == "🍫 Agregar Ingredientes":
