@@ -7,27 +7,26 @@ import psycopg2
 import pandas as pd
 from datetime import date
 
-st.write("Secrets cargados:")
-st.write("host:", st.secrets.get("db_host"))
-st.write("user:", st.secrets.get("db_user"))
-st.write("name:", st.secrets.get("db_name"))
-st.write("password presente:", "db_password" in st.secrets)
+st.write("Intentando conectar a Supabase...")
 
-conn = psycopg2.connect(
-    host=st.secrets["db_host"],
-    database=st.secrets["db_name"],
-    user=st.secrets["db_user"],
-    password=st.secrets["db_password"],
-    port=5432
-)
-cursor = conn.cursor()
+try:
+    conn = psycopg2.connect(
+        host=st.secrets["db_host"],
+        database=st.secrets["db_name"],
+        user=st.secrets["db_user"],
+        password=st.secrets["db_password"],
+        port=5432
+    )
+    st.success("✅ Conectado a Supabase")
+    cursor = conn.cursor()
+    
+    # Test: mostrar 5 filas de una tabla
+    df = pd.read_sql_query("SELECT * FROM categorias_mp LIMIT 5", conn)
+    st.dataframe(df)
 
-st.success("Conexión con Supabase exitosa ✅")
-
-# Test opcional:
-df = pd.read_sql_query("SELECT * FROM categorias_mp LIMIT 5", conn)
-st.write("Datos de prueba:")
-st.dataframe(df)
+except Exception as e:
+    st.error("❌ No se pudo conectar a Supabase")
+    st.text(str(e))
 
 
 st.set_page_config(page_title="Chokoreto App", layout="wide")
