@@ -16,6 +16,14 @@ conn = psycopg2.connect(
 )
 cursor = conn.cursor()
 
+st.success("Conexión con Supabase exitosa ✅")
+
+# Test opcional:
+df = pd.read_sql_query("SELECT * FROM categorias_mp LIMIT 5", conn)
+st.write("Datos de prueba:")
+st.dataframe(df)
+
+
 st.set_page_config(page_title="Chokoreto App", layout="wide")
 st.sidebar.title("Menú")
 seccion = st.sidebar.radio("Ir a:", [
