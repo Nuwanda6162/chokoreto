@@ -320,9 +320,6 @@ elif seccion == "🧪 Producto (ABM)":
         st.success("Producto creado correctamente")
         st.rerun()
 
-import os
-st.text(f"Base de datos en: {os.path.abspath('chokoreto_costos.db')}")
-
 
 # 🍫 AGREGAR INGREDIENTES
 elif seccion == "🍫 Agregar Ingredientes":
