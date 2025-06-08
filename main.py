@@ -3,11 +3,17 @@
 # Incluye: Materias Primas (ABM), Categorías de MP, Categorías de Productos, Producto (ABM), Agregar Ingredientes
 
 import streamlit as st
-import sqlite3
+import psycopg2
 import pandas as pd
 from datetime import date
 
-conn = sqlite3.connect("chokoreto_costos.db", check_same_thread=False)
+conn = psycopg2.connect(
+    host="db.hjxwznufhldklnspdwcv.supabase.co",
+    database="postgres",
+    user="postgres",
+    password="rkH6C5tuAkhCDjTW",  # ← reemplazá esto por tu contraseña real
+    port=5432
+)
 cursor = conn.cursor()
 
 st.set_page_config(page_title="Chokoreto App", layout="wide")
