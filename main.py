@@ -7,7 +7,7 @@ import sqlite3
 import pandas as pd
 from datetime import date
 
-conn = sqlite3.connect("chokoreto_costos.db", check_same_thread=False)
+conn = sqlite3.connect("chokoreto_costos_subcategorias.db", check_same_thread=False)
 cursor = conn.cursor()
 
 st.set_page_config(page_title="Chokoreto App", layout="wide")
