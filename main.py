@@ -1,15 +1,14 @@
 
-# Este archivo incluye TODAS las secciones completas y funcionales
-# Incluye: Materias Primas (ABM), Categorías de MP, Categorías de Productos, Producto (ABM), Agregar Ingredientes
-
+# Streamlit app local para gestión de costos de Chokoreto con SQLite
 import streamlit as st
 import sqlite3
 import pandas as pd
 from datetime import date
 
+# Conectar a la base SQLite local
 conn = sqlite3.connect("chokoreto_costos.db", check_same_thread=False)
 cursor = conn.cursor()
-    
+
 st.set_page_config(page_title="Chokoreto App", layout="wide")
 st.sidebar.title("Menú")
 seccion = st.sidebar.radio("Ir a:", [
@@ -28,7 +27,9 @@ if seccion == "🧱 Materias Primas (ABM)":
     cat_df = pd.read_sql_query("SELECT * FROM categorias_mp", conn)
     if not cat_df.empty:
         cat_sel = st.selectbox("Categoría", cat_df["nombre"].tolist(), key="cat_mp_abm")
-        sub_df = pd.read_sql_query("SELECT sub.id, sub.nombre FROM subcategorias_mp sub JOIN categorias_mp cat ON sub.categoria_id = cat.id WHERE cat.nombre = ?", conn, params=(cat_sel,))
+        sub_df = pd.read_sql_query(
+            "SELECT sub.id, sub.nombre FROM subcategorias_mp sub JOIN categorias_mp cat ON sub.categoria_id = cat.id WHERE cat.nombre = ?",
+            conn, params=(cat_sel,))
         sub_dict = dict(zip(sub_df["nombre"], sub_df["id"]))
         if sub_dict:
             sub_sel = st.selectbox("Subcategoría", list(sub_dict.keys()), key="subcat_mp_abm")
@@ -77,11 +78,15 @@ if seccion == "🧱 Materias Primas (ABM)":
     st.subheader("Agregar nueva materia prima")
     nuevo_nombre = st.text_input("Nombre")
     nueva_cant = st.number_input("Cantidad nueva", min_value=0.0, step=0.01)
-    nueva_unidad = st.selectbox("Unidad nueva", ["Mililitros", "Centímetros cúbicos", "Centímetros", "Gramos", "Unidad"], key="unidad_new")
+    nueva_unidad = st.selectbox("Unidad nueva",
+                                ["Mililitros", "Centímetros cúbicos", "Centímetros", "Gramos", "Unidad"],
+                                key="unidad_new")
     nuevo_precio = st.number_input("Precio de compra nuevo", min_value=0.0, step=0.01, key="precio_new")
     fecha_new = st.date_input("Fecha de actualización", key="fecha_new")
     cat_new = st.selectbox("Categoría nueva", cat_df["nombre"].tolist(), key="cat_new")
-    subcat_new_df = pd.read_sql_query("SELECT sub.id, sub.nombre FROM subcategorias_mp sub JOIN categorias_mp cat ON sub.categoria_id = cat.id WHERE cat.nombre = ?", conn, params=(cat_new,))
+    subcat_new_df = pd.read_sql_query(
+        "SELECT sub.id, sub.nombre FROM subcategorias_mp sub JOIN categorias_mp cat ON sub.categoria_id = cat.id WHERE cat.nombre = ?",
+        conn, params=(cat_new,))
     subcat_new_dict = dict(zip(subcat_new_df["nombre"], subcat_new_df["id"]))
     if subcat_new_dict:
         subcat_new_sel = st.selectbox("Subcategoría nueva", list(subcat_new_dict.keys()), key="subcat_new")
@@ -91,7 +96,8 @@ if seccion == "🧱 Materias Primas (ABM)":
             cursor.execute("""
                 INSERT INTO materias_primas (nombre, unidad, cantidad, precio_compra, precio_por_unidad, fecha_actualizacion, subcategoria_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (nuevo_nombre.strip(), nueva_unidad, nueva_cant, nuevo_precio, nuevo_ppu, str(fecha_new), subcat_new_id))
+            """, (nuevo_nombre.strip(), nueva_unidad, nueva_cant, nuevo_precio, nuevo_ppu, str(fecha_new),
+                  subcat_new_id))
             conn.commit()
             st.success("Materia prima guardada correctamente")
             st.rerun()
@@ -125,13 +131,16 @@ elif seccion == "📂 Categorías de MP (ABM)":
                 conn.commit()
                 st.rerun()
     st.subheader("Subcategorías")
-    subcats_df = pd.read_sql_query("SELECT sub.id, sub.nombre, cat.nombre AS categoria FROM subcategorias_mp sub JOIN categorias_mp cat ON sub.categoria_id = cat.id", conn)
+    subcats_df = pd.read_sql_query(
+        "SELECT sub.id, sub.nombre, cat.nombre AS categoria FROM subcategorias_mp sub JOIN categorias_mp cat ON sub.categoria_id = cat.id",
+        conn)
     st.dataframe(subcats_df)
     subcat_nombre = st.text_input("Nueva Subcategoría", key="nueva_subcat_mp")
     cat_sub_sel = st.selectbox("Categoría para la subcategoría", categorias_df["nombre"].tolist(), key="cat_sub_sel")
     cat_sub_id = cat_dict[cat_sub_sel]
     if st.button("Agregar Subcategoría"):
-        cursor.execute("INSERT INTO subcategorias_mp (nombre, categoria_id) VALUES (?, ?)", (subcat_nombre.strip(), cat_sub_id))
+        cursor.execute("INSERT INTO subcategorias_mp (nombre, categoria_id) VALUES (?, ?)",
+                       (subcat_nombre.strip(), cat_sub_id))
         conn.commit()
         st.rerun()
 
@@ -163,17 +172,21 @@ elif seccion == "⚙️ Categorías de Productos (ABM)":
                 conn.commit()
                 st.rerun()
     st.subheader("Subcategorías")
-    subcats_df = pd.read_sql_query("SELECT sp.id, sp.nombre, cp.nombre AS categoria FROM subcategorias_productos sp JOIN categoria_productos cp ON sp.categoria_id = cp.id", conn)
+    subcats_df = pd.read_sql_query(
+        "SELECT sp.id, sp.nombre, cp.nombre AS categoria FROM subcategorias_productos sp JOIN categoria_productos cp ON sp.categoria_id = cp.id",
+        conn)
     st.dataframe(subcats_df)
     subcat_nombre = st.text_input("Nueva Subcategoría", key="nueva_subcat_prod")
-    cat_sub_sel = st.selectbox("Categoría para la subcategoría", categorias_df["nombre"].tolist(), key="cat_sub_sel_prod")
+    cat_sub_sel = st.selectbox("Categoría para la subcategoría", categorias_df["nombre"].tolist(),
+                               key="cat_sub_sel_prod")
     cat_sub_id = cat_dict[cat_sub_sel]
     if st.button("Agregar Subcategoría", key="agregar_subcat_prod"):
-        cursor.execute("INSERT INTO subcategorias_productos (nombre, categoria_id) VALUES (?, ?)", (subcat_nombre.strip(), cat_sub_id))
+        cursor.execute("INSERT INTO subcategorias_productos (nombre, categoria_id) VALUES (?, ?)",
+                       (subcat_nombre.strip(), cat_sub_id))
         conn.commit()
         st.rerun()
 
-        
+
 
 
 # 🧪 PRODUCTO (ABM)
@@ -236,7 +249,8 @@ elif seccion == "🧪 Producto (ABM)":
             datos = pd.read_sql_query("SELECT * FROM productos WHERE id = ?", conn, params=(prod_id,)).iloc[0]
 
             new_nombre = st.text_input("Nuevo nombre del producto", value=datos["nombre"], key="prod_edit_nombre")
-            new_margen = st.number_input("Nuevo margen de ganancia", value=datos["margen"], step=0.1, key="prod_edit_margen")
+            new_margen = st.number_input("Nuevo margen de ganancia", value=datos["margen"], step=0.1,
+                                         key="prod_edit_margen")
 
             cat_names = categorias_prod["nombre"].tolist()
             idx_cat_actual = categorias_prod[categorias_prod["id"] == datos["categoria_id"]].index[0]
@@ -265,7 +279,8 @@ elif seccion == "🧪 Producto (ABM)":
                 else:
                     idx_sub = 0
 
-                subcat_sel = st.selectbox("Subcategoría", list(subcat_dict.keys()), index=idx_sub, key="prod_edit_subcat")
+                subcat_sel = st.selectbox("Subcategoría", list(subcat_dict.keys()), index=idx_sub,
+                                          key="prod_edit_subcat")
                 subcat_id = subcat_dict[subcat_sel]
 
             col1, col2 = st.columns(2)
@@ -285,7 +300,6 @@ elif seccion == "🧪 Producto (ABM)":
                     st.success("Producto eliminado")
                     st.rerun()
 
-
         st.subheader("Agregar nuevo producto")
     nuevo_nombre = st.text_input("Nombre del nuevo producto", key="nuevo_prod_nombre")
     nueva_cat = st.selectbox("Categoría del nuevo producto", categorias_prod["nombre"].tolist(), key="nuevo_prod_cat")
@@ -296,7 +310,8 @@ elif seccion == "🧪 Producto (ABM)":
     )
     subcat_dict_nuevos = dict(zip(subcats_nuevos["nombre"], subcats_nuevos["id"]))
     if subcat_dict_nuevos:
-        subcat_sel_nuevo = st.selectbox("Subcategoría del nuevo producto", list(subcat_dict_nuevos.keys()), key="nuevo_prod_subcat")
+        subcat_sel_nuevo = st.selectbox("Subcategoría del nuevo producto", list(subcat_dict_nuevos.keys()),
+                                        key="nuevo_prod_subcat")
         nueva_subcat_id = subcat_dict_nuevos[subcat_sel_nuevo]
     else:
         nueva_subcat_id = None
@@ -323,19 +338,24 @@ elif seccion == "🍫 Agregar Ingredientes":
         prod_sel = st.selectbox("Seleccioná un producto", list(prod_dict.keys()))
         prod_id = prod_dict[prod_sel]
         cat_filtro = st.selectbox("Filtrar por Categoría MP", cat_options["nombre"].tolist(), key="cat_mp_filtro")
-        subcats = pd.read_sql_query("SELECT sub.id, sub.nombre FROM subcategorias_mp sub JOIN categorias_mp cat ON sub.categoria_id = cat.id WHERE cat.nombre = ?", conn, params=(cat_filtro,))
+        subcats = pd.read_sql_query(
+            "SELECT sub.id, sub.nombre FROM subcategorias_mp sub JOIN categorias_mp cat ON sub.categoria_id = cat.id WHERE cat.nombre = ?",
+            conn, params=(cat_filtro,))
         subcat_dict = dict(zip(subcats["nombre"], subcats["id"]))
         if subcat_dict:
             subcat_sel = st.selectbox("Subcategoría", list(subcat_dict.keys()), key="subcat_mp_filtro")
             subcat_id = subcat_dict[subcat_sel]
-            materias = pd.read_sql_query("SELECT id, nombre FROM materias_primas WHERE subcategoria_id = ?", conn, params=(subcat_id,))
+            materias = pd.read_sql_query("SELECT id, nombre FROM materias_primas WHERE subcategoria_id = ?", conn,
+                                         params=(subcat_id,))
             if not materias.empty:
                 mp_dict = dict(zip(materias["nombre"], materias["id"]))
                 mp_sel = st.selectbox("Materia Prima", list(mp_dict.keys()), key="mp_sel")
                 mp_id = mp_dict[mp_sel]
                 cantidad = st.number_input("Cantidad utilizada", min_value=0.0, step=1.0)
                 if st.button("Agregar Ingrediente"):
-                    cursor.execute("INSERT INTO ingredientes_producto (producto_id, materia_prima_id, cantidad_usada) VALUES (?, ?, ?)", (prod_id, mp_id, cantidad))
+                    cursor.execute(
+                        "INSERT INTO ingredientes_producto (producto_id, materia_prima_id, cantidad_usada) VALUES (?, ?, ?)",
+                        (prod_id, mp_id, cantidad))
                     conn.commit()
                     st.success("Ingrediente agregado.")
         st.subheader("🧾 Ingredientes del producto")
@@ -349,7 +369,8 @@ elif seccion == "🍫 Agregar Ingredientes":
         if not resumen.empty:
             st.dataframe(resumen)
             total = resumen["costo"].sum()
-            margen_base = pd.read_sql_query("SELECT margen FROM productos WHERE id = ?", conn, params=(prod_id,)).iloc[0]["margen"]
+            margen_base = \
+            pd.read_sql_query("SELECT margen FROM productos WHERE id = ?", conn, params=(prod_id,)).iloc[0]["margen"]
             margen_actual = st.number_input("Simular margen", value=margen_base, step=0.1, key="sim_margen")
             st.markdown(f"**Costo total:** ${total:.2f}")
             st.markdown(f"**Precio sugerido:** ${total * margen_actual:.2f}")
