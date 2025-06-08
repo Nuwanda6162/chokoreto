@@ -1,3 +1,7 @@
+
+# Este archivo incluye TODAS las secciones completas y funcionales
+# Incluye: Materias Primas (ABM), Categorías de MP, Categorías de Productos, Producto (ABM), Agregar Ingredientes
+
 import streamlit as st
 import sqlite3
 import pandas as pd
@@ -131,6 +135,7 @@ elif seccion == "📂 Categorías de MP (ABM)":
         conn.commit()
         st.experimental_rerun()
 
+
 # ⚙️ CATEGORÍAS DE PRODUCTOS (ABM)
 elif seccion == "⚙️ Categorías de Productos (ABM)":
     st.title("⚙️ Categorías de Productos")
@@ -159,22 +164,17 @@ elif seccion == "⚙️ Categorías de Productos (ABM)":
             st.success("Categoría eliminada")
             st.experimental_rerun()
 
-# Placeholder para las otras dos secciones:
-# 🧪 Producto (ABM)
-# 🍫 Agregar Ingredientes
 
 # 🧪 PRODUCTO (ABM)
 elif seccion == "🧪 Producto (ABM)":
     st.title("🧪 Productos – ABM")
     categorias_prod = pd.read_sql_query("SELECT * FROM categoria_productos", conn)
-
     st.subheader("Filtrar y ver productos")
     if not categorias_prod.empty:
         cat_sel = st.selectbox("Categoría de productos", categorias_prod["nombre"].tolist(), key="cat_prod_filtro")
         cat_id = categorias_prod[categorias_prod["nombre"] == cat_sel]["id"].values[0]
         productos_df = pd.read_sql_query("SELECT * FROM productos WHERE categoria_id = ?", conn, params=(cat_id,))
         st.dataframe(productos_df)
-
         st.subheader("Editar o eliminar un producto")
         if not productos_df.empty:
             prod_dict = dict(zip(productos_df["nombre"], productos_df["id"]))
@@ -196,7 +196,6 @@ elif seccion == "🧪 Producto (ABM)":
                     conn.commit()
                     st.success("Producto eliminado")
                     st.experimental_rerun()
-
     st.subheader("Agregar nuevo producto")
     nuevo_nombre = st.text_input("Nombre del nuevo producto", key="nuevo_prod_nombre")
     nueva_cat = st.selectbox("Categoría del nuevo producto", categorias_prod["nombre"].tolist(), key="nuevo_prod_cat")
@@ -234,7 +233,6 @@ elif seccion == "🍫 Agregar Ingredientes":
                     cursor.execute("INSERT INTO ingredientes_producto (producto_id, materia_prima_id, cantidad_usada) VALUES (?, ?, ?)", (prod_id, mp_id, cantidad))
                     conn.commit()
                     st.success("Ingrediente agregado.")
-
         st.subheader("🧾 Ingredientes del producto")
         resumen = pd.read_sql_query("""
             SELECT mp.nombre AS materia_prima, ip.cantidad_usada, mp.precio_por_unidad,
