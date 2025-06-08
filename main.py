@@ -183,37 +183,94 @@ elif seccion == "🧪 Producto (ABM)":
 
     st.subheader("Filtrar y ver productos")
     if not categorias_prod.empty:
-        cat_sel = st.selectbox("Categoría de productos", categorias_prod["nombre"].tolist(), key="cat_prod_filtro")
+        cat_sel = st.selectbox(
+            "Categoría de productos",
+            categorias_prod["nombre"].tolist(),
+            key="cat_prod_filtro",
+        )
         cat_id = categorias_prod[categorias_prod["nombre"] == cat_sel]["id"].values[0]
 
-        productos_df = pd.read_sql_query("""
+        subcats_filtro_df = pd.read_sql_query(
+            "SELECT id, nombre FROM subcategorias_productos WHERE categoria_id = ?",
+            conn,
+            params=(cat_id,),
+        )
+        subcat_options = ["Todas"] + subcats_filtro_df["nombre"].tolist()
+        subcat_sel = st.selectbox(
+            "Subcategoría de productos", subcat_options, key="subcat_prod_filtro"
+        )
+        if subcat_sel != "Todas":
+            subcat_id_filtro = subcats_filtro_df[subcats_filtro_df["nombre"] == subcat_sel][
+                "id"
+            ].values[0]
+            productos_df = pd.read_sql_query(
+                """
+            SELECT p.id, p.nombre, p.margen, cp.nombre AS categoria, sp.nombre AS subcategoria
+            FROM productos p
+            LEFT JOIN categoria_productos cp ON p.categoria_id = cp.id
+            LEFT JOIN subcategorias_productos sp ON p.subcategoria_id = sp.id
+            WHERE p.categoria_id = ? AND p.subcategoria_id = ?
+        """,
+                conn,
+                params=(cat_id, subcat_id_filtro),
+            )
+        else:
+            productos_df = pd.read_sql_query(
+                """
             SELECT p.id, p.nombre, p.margen, cp.nombre AS categoria, sp.nombre AS subcategoria
             FROM productos p
             LEFT JOIN categoria_productos cp ON p.categoria_id = cp.id
             LEFT JOIN subcategorias_productos sp ON p.subcategoria_id = sp.id
             WHERE p.categoria_id = ?
-        """, conn, params=(cat_id,))
+        """,
+                conn,
+                params=(cat_id,),
+            )
         st.dataframe(productos_df)
 
         st.subheader("Editar o eliminar un producto")
         if not productos_df.empty:
             prod_dict = dict(zip(productos_df["nombre"], productos_df["id"]))
-            prod_sel = st.selectbox("Seleccioná un producto", list(prod_dict.keys()), key="prod_edit_sel")
+            prod_sel = st.selectbox(
+                "Seleccioná un producto", list(prod_dict.keys()), key="prod_edit_sel"
+            )
             prod_id = prod_dict[prod_sel]
-            datos = pd.read_sql_query("SELECT * FROM productos WHERE id = ?", conn, params=(prod_id,)).iloc[0]
+            datos = pd.read_sql_query(
+                "SELECT * FROM productos WHERE id = ?", conn, params=(prod_id,)
+            ).iloc[0]
 
-            new_nombre = st.text_input("Nuevo nombre del producto", value=datos["nombre"], key="prod_edit_nombre")
-            new_margen = st.number_input("Nuevo margen de ganancia", value=datos["margen"], step=0.1, key="prod_edit_margen")
+            new_nombre = st.text_input(
+                "Nuevo nombre del producto", value=datos["nombre"], key="prod_edit_nombre"
+            )
+            new_margen = st.number_input(
+                "Nuevo margen de ganancia", value=datos["margen"], step=0.1, key="prod_edit_margen"
+            )
+
+            cat_names = categorias_prod["nombre"].tolist()
+            idx_cat_actual = categorias_prod[categorias_prod["id"] == datos["categoria_id"]].index[0]
+            new_cat_sel = st.selectbox(
+                "Categoría", cat_names, index=idx_cat_actual, key="prod_edit_cat"
+            )
+            new_cat_id = categorias_prod[categorias_prod["nombre"] == new_cat_sel]["id"].values[0]
 
             subcats = pd.read_sql_query(
                 "SELECT * FROM subcategorias_productos WHERE categoria_id = ?",
                 conn,
-                params=(datos["categoria_id"],),
+                params=(new_cat_id,),
             )
             subcat_dict = dict(zip(subcats["nombre"], subcats["id"]))
             if subcat_dict:
+                nombre_sub_actual = pd.read_sql_query(
+                    "SELECT nombre FROM subcategorias_productos WHERE id = ?",
+                    conn,
+                    params=(datos.get("subcategoria_id"),),
+                )
+                if not nombre_sub_actual.empty and nombre_sub_actual.iloc[0]["nombre"] in subcat_dict:
+                    idx_sub = list(subcat_dict.keys()).index(nombre_sub_actual.iloc[0]["nombre"])
+                else:
+                    idx_sub = 0
                 subcat_sel = st.selectbox(
-                    "Subcategoría", list(subcat_dict.keys()), key="prod_edit_subcat"
+                    "Subcategoría", list(subcat_dict.keys()), index=idx_sub, key="prod_edit_subcat"
                 )
                 subcat_id = subcat_dict[subcat_sel]
             else:
@@ -223,7 +280,10 @@ elif seccion == "🧪 Producto (ABM)":
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("Actualizar producto", key="btn_actualizar_prod"):
-                    cursor.execute("UPDATE productos SET nombre = ?, margen = ?, subcategoria_id = ? WHERE id = ?", (new_nombre.strip(), new_margen, subcat_id, prod_id))
+                    cursor.execute(
+                        "UPDATE productos SET nombre = ?, margen = ?, categoria_id = ?, subcategoria_id = ? WHERE id = ?",
+                        (new_nombre.strip(), new_margen, new_cat_id, subcat_id, prod_id),
+                    )
                     conn.commit()
                     st.success("Producto actualizado correctamente")
                     st.rerun()
