@@ -137,32 +137,73 @@ elif seccion == "📂 Categorías de MP (ABM)":
 
 
 # ⚙️ CATEGORÍAS DE PRODUCTOS (ABM)
-elif seccion == "⚙️ Categorías de Productos (ABM)":
-    st.title("⚙️ Categorías de Productos")
-    categorias_df = pd.read_sql_query("SELECT * FROM categoria_productos", conn)
-    st.dataframe(categorias_df)
-    nueva_categoria = st.text_input("Nombre de la nueva categoría", key="nueva_categoria")
-    if st.button("Agregar", key="btn_agregar_categoria") and nueva_categoria:
-        cursor.execute("INSERT INTO categoria_productos (nombre) VALUES (?)", (nueva_categoria.strip(),))
+elif seccion == "🧪 Producto (ABM)":
+    st.title("🧪 Productos – ABM")
+    categorias_prod = pd.read_sql_query("SELECT * FROM categoria_productos", conn)
+
+    st.subheader("Filtrar y ver productos")
+    if not categorias_prod.empty:
+        cat_sel = st.selectbox("Categoría de productos", categorias_prod["nombre"].tolist(), key="cat_prod_filtro")
+        cat_id = categorias_prod[categorias_prod["nombre"] == cat_sel]["id"].values[0]
+
+        productos_df = pd.read_sql_query("""
+            SELECT p.id, p.nombre, p.margen, cp.nombre AS categoria, sp.nombre AS subcategoria
+            FROM productos p
+            LEFT JOIN categoria_productos cp ON p.categoria_id = cp.id
+            LEFT JOIN subcategorias_productos sp ON p.subcategoria_id = sp.id
+            WHERE p.categoria_id = ?
+        """, conn, params=(cat_id,))
+        st.dataframe(productos_df)
+
+        st.subheader("Editar o eliminar un producto")
+        if not productos_df.empty:
+            prod_dict = dict(zip(productos_df["nombre"], productos_df["id"]))
+            prod_sel = st.selectbox("Seleccioná un producto", list(prod_dict.keys()), key="prod_edit_sel")
+            prod_id = prod_dict[prod_sel]
+            datos = pd.read_sql_query("SELECT * FROM productos WHERE id = ?", conn, params=(prod_id,)).iloc[0]
+
+            new_nombre = st.text_input("Nuevo nombre del producto", value=datos["nombre"], key="prod_edit_nombre")
+            new_margen = st.number_input("Nuevo margen de ganancia", value=datos["margen"], step=0.1, key="prod_edit_margen")
+
+            subcats = pd.read_sql_query("SELECT * FROM subcategorias_productos WHERE categoria_id = ?", conn, params=(datos["categoria_id"],))
+            subcat_dict = dict(zip(subcats["nombre"], subcats["id"]))
+            subcat_sel = st.selectbox("Subcategoría", list(subcat_dict.keys()), key="prod_edit_subcat")
+            subcat_id = subcat_dict[subcat_sel]
+
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Actualizar producto", key="btn_actualizar_prod"):
+                    cursor.execute("UPDATE productos SET nombre = ?, margen = ?, subcategoria_id = ? WHERE id = ?", (new_nombre.strip(), new_margen, subcat_id, prod_id))
+                    conn.commit()
+                    st.success("Producto actualizado correctamente")
+                    st.experimental_rerun()
+            with col2:
+                if st.button("Eliminar producto", key="btn_eliminar_prod"):
+                    cursor.execute("DELETE FROM productos WHERE id = ?", (prod_id,))
+                    conn.commit()
+                    st.success("Producto eliminado")
+                    st.experimental_rerun()
+
+    st.subheader("Agregar nuevo producto")
+    nuevo_nombre = st.text_input("Nombre del nuevo producto", key="nuevo_prod_nombre")
+    nueva_cat = st.selectbox("Categoría del nuevo producto", categorias_prod["nombre"].tolist(), key="nuevo_prod_cat")
+    nueva_cat_id = categorias_prod[categorias_prod["nombre"] == nueva_cat]["id"].values[0]
+
+    subcats_nuevos = pd.read_sql_query("SELECT * FROM subcategorias_productos WHERE categoria_id = ?", conn, params=(nueva_cat_id,))
+    subcat_dict_nuevos = dict(zip(subcats_nuevos["nombre"], subcats_nuevos["id"]))
+    if subcat_dict_nuevos:
+        subcat_sel_nuevo = st.selectbox("Subcategoría del nuevo producto", list(subcat_dict_nuevos.keys()), key="nuevo_prod_subcat")
+        nueva_subcat_id = subcat_dict_nuevos[subcat_sel_nuevo]
+    else:
+        nueva_subcat_id = None
+
+    nuevo_margen = st.number_input("Margen de ganancia", min_value=1.0, value=3.0, step=0.1, key="nuevo_prod_margen")
+    if st.button("Crear Producto", key="crear_nuevo_prod"):
+        cursor.execute("INSERT INTO productos (nombre, categoria_id, subcategoria_id, margen) VALUES (?, ?, ?, ?)", (nuevo_nombre.strip(), nueva_cat_id, nueva_subcat_id, nuevo_margen))
         conn.commit()
-        st.success("Categoría agregada correctamente")
+        st.success("Producto creado correctamente")
         st.experimental_rerun()
-    seleccion = st.selectbox("Seleccioná una categoría", categorias_df["nombre"].tolist(), key="select_edit")
-    id_sel = categorias_df[categorias_df["nombre"] == seleccion]["id"].values[0]
-    nuevo_nombre = st.text_input("Nuevo nombre", value=seleccion, key="nuevo_nombre_cat")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Actualizar nombre", key="btn_actualizar_cat") and nuevo_nombre:
-            cursor.execute("UPDATE categoria_productos SET nombre = ? WHERE id = ?", (nuevo_nombre.strip(), id_sel))
-            conn.commit()
-            st.success("Nombre actualizado correctamente")
-            st.experimental_rerun()
-    with col2:
-        if st.button("Eliminar categoría", key="btn_eliminar_cat"):
-            cursor.execute("DELETE FROM categoria_productos WHERE id = ?", (id_sel,))
-            conn.commit()
-            st.success("Categoría eliminada")
-            st.experimental_rerun()
+        
 
 
 # 🧪 PRODUCTO (ABM)
