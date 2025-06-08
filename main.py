@@ -7,6 +7,12 @@ import psycopg2
 import pandas as pd
 from datetime import date
 
+st.write("Secrets cargados:")
+st.write("host:", st.secrets.get("db_host"))
+st.write("user:", st.secrets.get("db_user"))
+st.write("name:", st.secrets.get("db_name"))
+st.write("password presente:", "db_password" in st.secrets)
+
 conn = psycopg2.connect(
     host=st.secrets["db_host"],
     database=st.secrets["db_name"],
