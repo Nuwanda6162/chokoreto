@@ -8,10 +8,10 @@ import pandas as pd
 from datetime import date
 
 conn = psycopg2.connect(
-    host="db.hjxwznufhldklnspdwcv.supabase.co",
-    database="postgres",
-    user="postgres",
-    password=rkH6C5tuAkhCDjTW,  # ← reemplazá esto por tu contraseña real
+    host=st.secrets["db_host"],
+    database=st.secrets["db_name"],
+    user=st.secrets["db_user"],
+    password=st.secrets["db_password"],
     port=5432
 )
 cursor = conn.cursor()
