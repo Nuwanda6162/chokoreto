@@ -66,13 +66,13 @@ if seccion == "🧱 Materias Primas (ABM)":
                     """, (new_cant, new_precio, new_unidad, new_ppu, str(date.today()), mp_id))
                     conn.commit()
                     st.success("Materia prima actualizada")
-                    st.experimental_rerun()
+                    st.rerun()
             with col2:
                 if st.button("Eliminar MP"):
                     cursor.execute("DELETE FROM materias_primas WHERE id = ?", (mp_id,))
                     conn.commit()
                     st.success("Materia prima eliminada")
-                    st.experimental_rerun()
+                    st.rerun()
 
     st.subheader("Agregar nueva materia prima")
     nuevo_nombre = st.text_input("Nombre")
@@ -94,7 +94,7 @@ if seccion == "🧱 Materias Primas (ABM)":
             """, (nuevo_nombre.strip(), nueva_unidad, nueva_cant, nuevo_precio, nuevo_ppu, str(fecha_new), subcat_new_id))
             conn.commit()
             st.success("Materia prima guardada correctamente")
-            st.experimental_rerun()
+            st.rerun()
 
 
 # 📂 CATEGORÍAS DE MP (ABM)
@@ -107,7 +107,7 @@ elif seccion == "📂 Categorías de MP (ABM)":
     if st.button("Agregar Categoría"):
         cursor.execute("INSERT INTO categorias_mp (nombre) VALUES (?)", (nueva_cat.strip(),))
         conn.commit()
-        st.experimental_rerun()
+        st.rerun()
     cat_dict = dict(zip(categorias_df["nombre"], categorias_df["id"]))
     if cat_dict:
         cat_sel = st.selectbox("Editar o eliminar categoría", list(cat_dict.keys()), key="cat_edit_mp")
@@ -118,12 +118,12 @@ elif seccion == "📂 Categorías de MP (ABM)":
             if st.button("Actualizar Categoría"):
                 cursor.execute("UPDATE categorias_mp SET nombre = ? WHERE id = ?", (new_cat_name.strip(), cat_id))
                 conn.commit()
-                st.experimental_rerun()
+                st.rerun()
         with col2:
             if st.button("Eliminar Categoría"):
                 cursor.execute("DELETE FROM categorias_mp WHERE id = ?", (cat_id,))
                 conn.commit()
-                st.experimental_rerun()
+                st.rerun()
     st.subheader("Subcategorías")
     subcats_df = pd.read_sql_query("SELECT sub.id, sub.nombre, cat.nombre AS categoria FROM subcategorias_mp sub JOIN categorias_mp cat ON sub.categoria_id = cat.id", conn)
     st.dataframe(subcats_df)
@@ -133,7 +133,7 @@ elif seccion == "📂 Categorías de MP (ABM)":
     if st.button("Agregar Subcategoría"):
         cursor.execute("INSERT INTO subcategorias_mp (nombre, categoria_id) VALUES (?, ?)", (subcat_nombre.strip(), cat_sub_id))
         conn.commit()
-        st.experimental_rerun()
+        st.rerun()
 
 # ⚙️ Categorías de Productos (ABM)
 elif seccion == "⚙️ Categorías de Productos (ABM)":
@@ -145,7 +145,7 @@ elif seccion == "⚙️ Categorías de Productos (ABM)":
     if st.button("Agregar Categoría", key="agregar_cat_prod"):
         cursor.execute("INSERT INTO categoria_productos (nombre) VALUES (?)", (nueva_cat.strip(),))
         conn.commit()
-        st.experimental_rerun()
+        st.rerun()
     cat_dict = dict(zip(categorias_df["nombre"], categorias_df["id"]))
     if cat_dict:
         cat_sel = st.selectbox("Editar o eliminar categoría", list(cat_dict.keys()), key="cat_edit_prod")
@@ -156,12 +156,12 @@ elif seccion == "⚙️ Categorías de Productos (ABM)":
             if st.button("Actualizar Categoría", key="update_cat_prod"):
                 cursor.execute("UPDATE categoria_productos SET nombre = ? WHERE id = ?", (new_cat_name.strip(), cat_id))
                 conn.commit()
-                st.experimental_rerun()
+                st.rerun()
         with col2:
             if st.button("Eliminar Categoría", key="delete_cat_prod"):
                 cursor.execute("DELETE FROM categoria_productos WHERE id = ?", (cat_id,))
                 conn.commit()
-                st.experimental_rerun()
+                st.rerun()
     st.subheader("Subcategorías")
     subcats_df = pd.read_sql_query("SELECT sp.id, sp.nombre, cp.nombre AS categoria FROM subcategorias_productos sp JOIN categoria_productos cp ON sp.categoria_id = cp.id", conn)
     st.dataframe(subcats_df)
@@ -171,7 +171,7 @@ elif seccion == "⚙️ Categorías de Productos (ABM)":
     if st.button("Agregar Subcategoría", key="agregar_subcat_prod"):
         cursor.execute("INSERT INTO subcategorias_productos (nombre, categoria_id) VALUES (?, ?)", (subcat_nombre.strip(), cat_sub_id))
         conn.commit()
-        st.experimental_rerun()
+        st.rerun()
 
         
 
@@ -226,13 +226,13 @@ elif seccion == "🧪 Producto (ABM)":
                     cursor.execute("UPDATE productos SET nombre = ?, margen = ?, subcategoria_id = ? WHERE id = ?", (new_nombre.strip(), new_margen, subcat_id, prod_id))
                     conn.commit()
                     st.success("Producto actualizado correctamente")
-                    st.experimental_rerun()
+                    st.rerun()
             with col2:
                 if st.button("Eliminar producto", key="btn_eliminar_prod"):
                     cursor.execute("DELETE FROM productos WHERE id = ?", (prod_id,))
                     conn.commit()
                     st.success("Producto eliminado")
-                    st.experimental_rerun()
+                    st.rerun()
 
     st.subheader("Agregar nuevo producto")
     nuevo_nombre = st.text_input("Nombre del nuevo producto", key="nuevo_prod_nombre")
@@ -252,7 +252,7 @@ elif seccion == "🧪 Producto (ABM)":
         cursor.execute("INSERT INTO productos (nombre, categoria_id, subcategoria_id, margen) VALUES (?, ?, ?, ?)", (nuevo_nombre.strip(), nueva_cat_id, nueva_subcat_id, nuevo_margen))
         conn.commit()
         st.success("Producto creado correctamente")
-        st.experimental_rerun()
+        st.rerun()
 
 # 🍫 AGREGAR INGREDIENTES
 elif seccion == "🍫 Agregar Ingredientes":
