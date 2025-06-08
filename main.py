@@ -205,10 +205,20 @@ elif seccion == "🧪 Producto (ABM)":
             new_nombre = st.text_input("Nuevo nombre del producto", value=datos["nombre"], key="prod_edit_nombre")
             new_margen = st.number_input("Nuevo margen de ganancia", value=datos["margen"], step=0.1, key="prod_edit_margen")
 
-            subcats = pd.read_sql_query("SELECT * FROM subcategorias_productos WHERE categoria_id = ?", conn, params=(datos["categoria_id"],))
+            subcats = pd.read_sql_query(
+                "SELECT * FROM subcategorias_productos WHERE categoria_id = ?",
+                conn,
+                params=(datos["categoria_id"],),
+            )
             subcat_dict = dict(zip(subcats["nombre"], subcats["id"]))
-            subcat_sel = st.selectbox("Subcategoría", list(subcat_dict.keys()), key="prod_edit_subcat")
-            subcat_id = subcat_dict[subcat_sel]
+            if subcat_dict:
+                subcat_sel = st.selectbox(
+                    "Subcategoría", list(subcat_dict.keys()), key="prod_edit_subcat"
+                )
+                subcat_id = subcat_dict[subcat_sel]
+            else:
+                st.info("No hay subcategorías disponibles para esta categoría")
+                subcat_id = datos.get("subcategoria_id")
 
             col1, col2 = st.columns(2)
             with col1:
