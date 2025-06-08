@@ -3,32 +3,13 @@
 # Incluye: Materias Primas (ABM), Categorías de MP, Categorías de Productos, Producto (ABM), Agregar Ingredientes
 
 import streamlit as st
-import psycopg2
+import sqlite3
 import pandas as pd
 from datetime import date
 
-st.write("Intentando conectar a Supabase...")
-
-try:
-    conn = psycopg2.connect(
-        host=st.secrets["db_host"],
-        database=st.secrets["db_name"],
-        user=st.secrets["db_user"],
-        password=st.secrets["db_password"],
-        port=5432
-    )
-    st.success("✅ Conectado a Supabase")
-    cursor = conn.cursor()
+conn = sqlite3.connect("chokoreto_costos.db", check_same_thread=False)
+cursor = conn.cursor()
     
-    # Test: mostrar 5 filas de una tabla
-    df = pd.read_sql_query("SELECT * FROM categorias_mp LIMIT 5", conn)
-    st.dataframe(df)
-
-except Exception as e:
-    st.error("❌ No se pudo conectar a Supabase")
-    st.text(str(e))
-
-
 st.set_page_config(page_title="Chokoreto App", layout="wide")
 st.sidebar.title("Menú")
 seccion = st.sidebar.radio("Ir a:", [
