@@ -837,11 +837,7 @@ elif seccion == "💵 Movimientos":
     ])
     with tab1:
         st.title("📦 Registrar Venta")
-        
-        # Mostrar último registro exitoso
-        if "ultima_venta" in st.session_state:
-            st.success(f"Última venta: {st.session_state['ultima_venta']}")
-        
+
         # 1. Cargar todos los productos y sus datos asociados
         productos_full = pd.read_sql_query("""
             SELECT p.id, p.nombre, p.precio_normalizado, 
@@ -850,85 +846,83 @@ elif seccion == "💵 Movimientos":
             JOIN subcategorias_productos sp ON p.subcategoria_id = sp.id
             JOIN categoria_productos cp ON sp.categoria_id = cp.id
         """, conn)
-        
+
         if productos_full.empty:
             st.warning("No hay productos cargados.")
         else:
-            # Buscador rápido
-            busqueda = st.text_input(
-                "Buscar producto (nombre, subcategoría o categoría):", 
-                value="", key="busqueda_venta"
-            ).lower()
+            # 2. Búsqueda por texto libre
+            busqueda = st.text_input("Buscar producto (nombre, subcategoría o categoría):").lower()
             if busqueda:
                 productos_filtrados = productos_full[
                     productos_full["nombre"].str.lower().str.contains(busqueda) |
                     productos_full["subcategoria"].str.lower().str.contains(busqueda) |
                     productos_full["categoria"].str.lower().str.contains(busqueda)
-                ]
+                    ]
             else:
                 productos_filtrados = productos_full.copy()
-        
+
             if productos_filtrados.empty:
                 st.warning("No se encontraron productos que coincidan.")
             else:
+                # 3. Armamos las opciones mostrando nombre + categoría/subcategoría para más info visual
                 opciones = productos_filtrados["nombre"] + " [" + productos_filtrados["categoria"] + " / " + \
                            productos_filtrados["subcategoria"] + "]"
                 prod_idx = st.selectbox("Seleccioná el producto", opciones.tolist(), key="prod_busqueda")
                 producto = productos_filtrados.iloc[opciones.tolist().index(prod_idx)]
-        
+
                 st.info(f"**Categoría:** {producto['categoria']}  |  **Subcategoría:** {producto['subcategoria']}")
                 st.info(f"**Precio unitario:** ${producto['precio_normalizado']:.2f}")
-        
+
                 precio_actual = producto['precio_normalizado']
-        
-                # Default cantidad 1
-                cantidad = st.number_input(
-                    "Cantidad vendida", min_value=1, value=1, step=1, key="cant_venta"
+
+                # Validación de precio válido
+                precio_valido = (
+                        precio_actual is not None and
+                        not (isinstance(precio_actual, float) and (math.isnan(precio_actual) or precio_actual <= 0)) and
+                        precio_actual != "None"
                 )
-        
-                # Recordar tipo de pago anterior
-                tipo_pago_default = st.session_state.get("tipo_pago", "Efectivo")
-                tipo_pago = st.selectbox(
-                    "Tipo de pago", ["Efectivo", "Otros"],
-                    key="pago_venta",
-                    index=0 if tipo_pago_default == "Efectivo" else 1
-                )
-        
-                descuento = st.number_input(
-                    "Descuento (%)", min_value=0.0, max_value=100.0, value=0.0, step=0.5, key="desc_venta"
-                )
-                fecha_actual = st.date_input("Fecha de actualización", key="fecha_new")
-        
-                # Calculo con descuento
-                precio_unitario_con_descuento = round(precio_actual * (1 - descuento / 100), 2)
-                total = round(precio_unitario_con_descuento * cantidad, 2)
-        
-                st.info(f"💲 Precio unitario actual: **${precio_actual:.2f}**")
-                if descuento > 0:
-                    st.info(f"💲 Precio unitario con descuento: **${precio_unitario_con_descuento:.2f}**")
-                st.info(f"💰 Total de esta venta: **${total:.2f}**")
-        
+
                 descripcion_libre = ""
-                if producto["nombre"].lower() in ["ingreso libre", "varios", "reserva", "otros"]:
+                if producto["nombre"].lower() in ["ingreso libre", "varios", "reserva",
+                                                  "otros"]:  # o el nombre que decidas
                     st.info("Estás registrando una venta de tipo ingreso libre.")
                     descripcion_libre = st.text_area("Descripción (ej: reserva, seña, evento, etc.)")
-        
+                    cantidad = st.number_input("Monto recibido ($)", min_value=1, value=1, step=1, key="cant_venta")
+                    tipo_pago = st.selectbox("Tipo de pago", ["Efectivo", "Otros"], key="pago_venta")
+                    descuento = 0.0  # opcional: deshabilitá descuento en este caso
+                    fecha_actual = st.date_input("Fecha de actualización", key="fecha_new")
+                    st.info(f"💲 Ingreso libre registrado: **${cantidad:.2f}**")
+                    total = cantidad
+                    total_unitario = 1.0  # siempre $1
+                elif not precio_valido:
+                    st.error("❌ Este producto no tiene un precio válido. Verificá ingredientes y costo.")
+                else:
+                    cantidad = st.number_input("Cantidad vendida", min_value=1, value=1, step=1, key="cant_venta")
+                    tipo_pago = st.selectbox("Tipo de pago", ["Efectivo", "Otros"], key="pago_venta")
+                    descuento = st.number_input("Descuento (%)", min_value=0.0, max_value=100.0, value=0.0, step=0.5,
+                                                key="desc_venta")
+                    fecha_actual = st.date_input("Fecha de actualización", key="fecha_new")
+                    st.info(f"💲 Precio unitario actual: **${round(precio_actual, 2)}**")
+                    total = round(precio_actual * cantidad * (1 - descuento / 100), 2)
+                    total_unitario = round(precio_actual * (1 - descuento / 100), 2)
+                    st.info(f"💰 Total de esta venta con descuento aplicado: **${total}**")
+
                 if st.button("Registrar Venta", key="btn_guardar_venta"):
                     try:
                         if not producto['id'] or cantidad <= 0:
                             st.error("❌ Completá todos los datos de la venta.")
                         else:
+                            #                            fecha_actual = date.today().isoformat()
                             producto_id = int(producto['id'])
+
                             cursor.execute("""
                                 INSERT INTO ventas (producto_id, cantidad, tipo_pago, fecha, precio_unitario, descripcion)
                                 VALUES (%s, %s, %s, %s, %s, %s)
-                            """, (producto_id, cantidad, tipo_pago, str(fecha_actual), precio_unitario_con_descuento, descripcion_libre))
+                            """, (producto_id, cantidad, tipo_pago, str(fecha_actual), total_unitario,
+                                  descripcion_libre))
                             conn.commit()
-                            # Recordar tipo de pago para la próxima venta
-                            st.session_state["tipo_pago"] = tipo_pago
-                            # Guardar resumen de la última venta
-                            st.session_state['ultima_venta'] = f"{cantidad} × {producto['nombre']} ({producto['categoria']} / {producto['subcategoria']}) – ${total} el {fecha_actual}"
-                            st.success(f"✅ Venta registrada: {cantidad} × {producto['nombre']} – ${total}")
+                            st.success(
+                                f"Venta registrada correctamente – {cantidad} × {producto['nombre']} el {fecha_actual}")
                             st.rerun()
                     except Exception as e:
                         st.error(f"❌ Ocurrió un error al registrar la venta: {e}")
