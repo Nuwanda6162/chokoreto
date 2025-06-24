@@ -1277,7 +1277,7 @@ elif seccion == "🧪 Simulador de productos":
                 mp_row = mp_df[mp_df["nombre"] == mp_sel].iloc[0]
                 unidad = mp_row["unidad"]
                 precio_por_unidad = mp_row["precio_por_unidad"]
-                cant_usada = st.number_input(f"Cantidad usada ({unidad})", min_value=0.0, step=0.01, key="sim_cant_usada")
+                cant_usada = st.number_input(f"Cantidad usada ({unidad})", min_value=0.0, value=1.0, step=0.1, key="sim_cant_usada")
 
                 if st.button("Agregar a simulación"):
                     # Ver si ya existe y suma cantidades
@@ -1332,14 +1332,17 @@ elif seccion == "🧪 Simulador de productos":
 
         # Calcula costo total, margen y precios
         costo_total = sim_df["costo"].sum()
-        margen = st.number_input("Margen de ganancia", min_value=0.1, value=2.0, step=0.1, key="simulador_margen")
+        margen = st.number_input("Margen de ganancia", min_value=0.1, value=3.0, step=0.1, key="simulador_margen")
+        descuento = st.number_input("Descuento (%)", min_value=0.0, max_value=100.0, value=0.0, step=5,key="simulador_descuento")
         precio_final = round(costo_total * margen, 2)
         try:
             precio_normalizado = redondeo_personalizado(precio_final)
         except:
             precio_normalizado = precio_final
 
-        ganancia = precio_normalizado - costo_total
+        precio_con_descuento = round(precio_normalizado * (1 - descuento / 100), 2)
+        ganancia = precio_con_descuento - costo_total
+        #ganancia = precio_normalizado - costo_total
 
         st.dataframe(sim_df[["nombre", "unidad", "cantidad_usada", "precio_por_unidad", "costo"]])
         st.info(f"🧮 **Costo total:** ${costo_total:.2f}")
