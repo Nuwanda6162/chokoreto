@@ -5,6 +5,9 @@ import pandas as pd
 from datetime import date
 import math
 import numpy as np
+from dotenv import load_dotenv
+import os
+import psycopg2
 
 # Conectar a la base SQLite local
 #import sqlite3
@@ -12,19 +15,20 @@ import numpy as np
 #cursor = conn.cursor()
 
 # Conectar a la base Supabase
-import psycopg2
+
+load_dotenv()  # Esto carga el .env
 
 conn = psycopg2.connect(
-    host="db.ziuxwxlpqtdxyojpzhqs.supabase.co",
-    port=5432,
-    dbname="postgres",
-    user="postgres",
-    password="WOOoc8hgs0ulXNjU"
+    host=os.getenv("DB_HOST"),
+    dbname=os.getenv("DB_NAME"),
+    user=os.getenv("DB_USER"),
+    password=os.getenv("DB_PASS"),
+    port=os.getenv("DB_PORT"),
+    sslmode="require"
 )
 cursor = conn.cursor()
-cursor.execute("SELECT * FROM categoria_productos;")
-print(cursor.fetchall())
-conn.close()
+
+
 
 
 # Funcion de redondeo
@@ -67,7 +71,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
         if not cat_df.empty:
             cat_sel = st.selectbox("Categoría", cat_df["nombre"].tolist(), key="cat_mp_abm")
             sub_df = pd.read_sql_query(
-                "SELECT sub.id, sub.nombre FROM subcategorias_mp sub JOIN categorias_mp cat ON sub.categoria_id = cat.id WHERE cat.nombre = ?",
+                "SELECT sub.id, sub.nombre FROM subcategorias_mp sub JOIN categorias_mp cat ON sub.categoria_id = cat.id WHERE cat.nombre = %s",
                 conn, params=(cat_sel,))
             sub_dict = dict(zip(sub_df["nombre"], sub_df["id"]))
             if sub_dict:
@@ -82,7 +86,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                     FROM materias_primas mp
                     JOIN subcategorias_mp sub ON mp.subcategoria_id = sub.id
                     JOIN categorias_mp cat ON sub.categoria_id = cat.id
-                    WHERE mp.subcategoria_id = ?
+                    WHERE mp.subcategoria_id = %s
                 """, conn, params=(sub_id,))
 
                 if mp_df.empty:
@@ -121,14 +125,14 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                                                                                                   "cantidad"] > 0 else 0.0
                                     cursor.execute("""
                                         UPDATE materias_primas
-                                        SET nombre = ?, cantidad = ?, unidad = ?, precio_compra = ?, precio_por_unidad = ?, fecha_actualizacion = ?
-                                        WHERE id = ?
+                                        SET nombre = %s, cantidad = %s, unidad = %s, precio_compra = %s, precio_por_unidad = %s, fecha_actualizacion = %s
+                                        WHERE id = %s
                                     """, (row["nombre"], row["cantidad"], row["unidad"], row["precio_compra"], ppu,
                                           str(date.today()), row["id"]))
                                     conn.commit()
                                     # Recalculo automático de productos
                                     prod_ids = pd.read_sql_query(
-                                        "SELECT producto_id FROM ingredientes_producto WHERE materia_prima_id = ?",
+                                        "SELECT producto_id FROM ingredientes_producto WHERE materia_prima_id = %s",
                                         conn, params=(row["id"],)
                                     )["producto_id"].tolist()
                                     for pid in prod_ids:
@@ -136,19 +140,19 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                                             SELECT ip.cantidad_usada, mp.precio_por_unidad
                                             FROM ingredientes_producto ip
                                             JOIN materias_primas mp ON ip.materia_prima_id = mp.id
-                                            WHERE ip.producto_id = ?
+                                            WHERE ip.producto_id = %s
                                         """
                                         ing_df = pd.read_sql_query(q, conn, params=(pid,))
                                         costo_total = (ing_df["cantidad_usada"] * ing_df[
                                             "precio_por_unidad"]).sum() if not ing_df.empty else 0.0
-                                        margen = pd.read_sql_query("SELECT margen FROM productos WHERE id = ?", conn,
+                                        margen = pd.read_sql_query("SELECT margen FROM productos WHERE id = %s", conn,
                                                                    params=(pid,)).iloc[0]["margen"]
                                         precio_final = round(costo_total * margen, 2)
                                         precio_normalizado = redondeo_personalizado(precio_final)
                                         cursor.execute("""
                                             UPDATE productos
-                                            SET precio_costo = ?, precio_final = ?, precio_normalizado = ?
-                                            WHERE id = ?
+                                            SET precio_costo = %s, precio_final = %s, precio_normalizado = %s
+                                            WHERE id = %s
                                         """, (costo_total, precio_final, precio_normalizado, pid))
                                         conn.commit()
                                     cambios += 1
@@ -173,7 +177,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
         fecha_new = st.date_input("Fecha de actualización", key="fecha_new")
         cat_new = st.selectbox("Categoría nueva", cat_df["nombre"].tolist(), key="cat_new")
         subcat_new_df = pd.read_sql_query(
-            "SELECT sub.id, sub.nombre FROM subcategorias_mp sub JOIN categorias_mp cat ON sub.categoria_id = cat.id WHERE cat.nombre = ?",
+            "SELECT sub.id, sub.nombre FROM subcategorias_mp sub JOIN categorias_mp cat ON sub.categoria_id = cat.id WHERE cat.nombre = %s",
             conn, params=(cat_new,))
         subcat_new_dict = dict(zip(subcat_new_df["nombre"], subcat_new_df["id"]))
         if subcat_new_dict:
@@ -184,7 +188,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                     nuevo_ppu = round(nuevo_precio / nueva_cant, 4) if nueva_cant else 0.0
                     cursor.execute("""
                         INSERT INTO materias_primas (nombre, unidad, cantidad, precio_compra, precio_por_unidad, fecha_actualizacion, subcategoria_id)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
                     """, (nuevo_nombre.strip(), nueva_unidad, nueva_cant, nuevo_precio, nuevo_ppu, str(fecha_new),
                           subcat_new_id))
                     conn.commit()
@@ -223,7 +227,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                     orig_row = editable_df.loc[idx]
                     if row["nombre"] != orig_row["nombre"]:
                         try:
-                            cursor.execute("UPDATE categorias_mp SET nombre = ? WHERE id = ?",
+                            cursor.execute("UPDATE categorias_mp SET nombre = %s WHERE id = %s",
                                            (row["nombre"], row["id"]))
                             conn.commit()
                             cambios += 1
@@ -245,7 +249,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                 st.warning("Por favor, ingresá un nombre de categoría.")
             else:
                 try:
-                    cursor.execute("INSERT INTO categorias_mp (nombre) VALUES (?)", (nueva_cat.strip(),))
+                    cursor.execute("INSERT INTO categorias_mp (nombre) VALUES (%s)", (nueva_cat.strip(),))
                     conn.commit()
                     st.success("¡Categoría agregada correctamente!")
                     st.rerun()
@@ -283,7 +287,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                     orig_row = editable_df.loc[idx]
                     if row["nombre"] != orig_row["nombre"]:
                         try:
-                            cursor.execute("UPDATE subcategorias_mp SET nombre = ? WHERE id = ?",
+                            cursor.execute("UPDATE subcategorias_mp SET nombre = %s WHERE id = %s",
                                            (row["nombre"], row["id"]))
                             conn.commit()
                             cambios += 1
@@ -314,7 +318,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                 else:
                     try:
                         cursor.execute(
-                            "INSERT INTO subcategorias_mp (nombre, categoria_id) VALUES (?, ?)",
+                            "INSERT INTO subcategorias_mp (nombre, categoria_id) VALUES (%s, %s)",
                             (subcat_nombre.strip(), cat_id))
                         conn.commit()
                         st.success("¡Subcategoría agregada!")
@@ -351,7 +355,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                     orig_row = editable_catprod_df.loc[idx]
                     if row["nombre"] != orig_row["nombre"]:
                         try:
-                            cursor.execute("UPDATE categoria_productos SET nombre = ? WHERE id = ?",
+                            cursor.execute("UPDATE categoria_productos SET nombre = %s WHERE id = %s",
                                            (row["nombre"], row["id"]))
                             conn.commit()
                             cambios += 1
@@ -372,7 +376,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
             cat_id = cat_dict[cat_sel]
             if st.button("Eliminar Categoría", key="delete_cat_prod"):
                 try:
-                    cursor.execute("DELETE FROM categoria_productos WHERE id = ?", (cat_id,))
+                    cursor.execute("DELETE FROM categoria_productos WHERE id = %s", (cat_id,))
                     conn.commit()
                     st.success("¡Categoría eliminada!")
                     st.rerun()
@@ -386,7 +390,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
         nueva_cat = st.text_input("Nueva Categoría", key="nueva_cat_prod")
         if st.button("Agregar Categoría", key="agregar_cat_prod"):
             try:
-                cursor.execute("INSERT INTO categoria_productos (nombre) VALUES (?)", (nueva_cat.strip(),))
+                cursor.execute("INSERT INTO categoria_productos (nombre) VALUES (%s)", (nueva_cat.strip(),))
                 conn.commit()
                 st.success("¡Categoría agregada correctamente!")
                 st.rerun()
@@ -423,7 +427,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                     orig_row = editable_subcatprod_df.loc[idx]
                     if row["nombre"] != orig_row["nombre"]:
                         try:
-                            cursor.execute("UPDATE subcategorias_productos SET nombre = ? WHERE id = ?",
+                            cursor.execute("UPDATE subcategorias_productos SET nombre = %s WHERE id = %s",
                                            (row["nombre"], row["id"]))
                             conn.commit()
                             cambios += 1
@@ -446,7 +450,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                 SELECT sp.id, sp.nombre, cp.nombre AS categoria
                 FROM subcategorias_productos sp
                 JOIN categoria_productos cp ON sp.categoria_id = cp.id
-                WHERE cp.id = ?
+                WHERE cp.id = %s
             """, conn, params=(cat_sub_id,))
 
         if subcats_df.empty:
@@ -457,7 +461,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
         subcat_nombre = st.text_input("Nueva Subcategoría", key="nueva_subcat_prod")
         if st.button("Agregar Subcategoría", key="agregar_subcat_prod"):
             try:
-                cursor.execute("INSERT INTO subcategorias_productos (nombre, categoria_id) VALUES (?, ?)",
+                cursor.execute("INSERT INTO subcategorias_productos (nombre, categoria_id) VALUES (%s, %s)",
                                (subcat_nombre.strip(), cat_sub_id))
                 conn.commit()
                 st.success("¡Subcategoría agregada!")
@@ -478,7 +482,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
             sub_df = pd.read_sql_query("""
                     SELECT sp.id, sp.nombre FROM subcategorias_productos sp
                     JOIN categoria_productos cp ON sp.categoria_id = cp.id
-                    WHERE cp.nombre = ?
+                    WHERE cp.nombre = %s
                 """, conn, params=(cat_sel,))
             sub_dict = dict(zip(sub_df["nombre"], sub_df["id"]))
 
@@ -491,7 +495,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                 productos_df = pd.read_sql_query("""
                     SELECT id, nombre, margen, precio_costo, precio_final, precio_normalizado
                     FROM productos
-                    WHERE subcategoria_id = ?
+                    WHERE subcategoria_id = %s
                 """, conn, params=(sub_id,))
 
                 if productos_df.empty:
@@ -528,8 +532,8 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                                     precio_normalizado = redondeo_personalizado(precio_final)
                                     cursor.execute("""
                                         UPDATE productos
-                                        SET nombre = ?, margen = ?, precio_final = ?, precio_normalizado = ?
-                                        WHERE id = ?
+                                        SET nombre = %s, margen = %s, precio_final = %s, precio_normalizado = %s
+                                        WHERE id = %s
                                     """, (row["nombre"], row["margen"], precio_final, precio_normalizado, row["id"]))
                                     conn.commit()
                                     cambios += 1
@@ -548,7 +552,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                     prod_dict = dict(zip(productos_df["nombre"], productos_df["id"]))
                     prod_sel = st.selectbox("Seleccioná un producto", sorted(prod_dict.keys()), key="prod_edit_sel")
                     prod_id = prod_dict[prod_sel]
-                    datos = pd.read_sql_query("SELECT * FROM productos WHERE id = ?", conn, params=(prod_id,)).iloc[0]
+                    datos = pd.read_sql_query("SELECT * FROM productos WHERE id = %s", conn, params=(prod_id,)).iloc[0]
 
                     nuevo_nombre = st.text_input("Nombre", value=datos["nombre"], key="edit_nombre_prod")
                     nuevo_margen = st.number_input("Margen de ganancia", value=float(datos["margen"]), step=0.1,
@@ -567,8 +571,8 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                             try:
                                 precio_normalizado = round(precio_final, -2)
                                 cursor.execute("""
-                                        UPDATE productos SET nombre = ?, margen = ?, precio_final = ?, precio_normalizado = ?
-                                        WHERE id = ?
+                                        UPDATE productos SET nombre = %s, margen = %s, precio_final = %s, precio_normalizado = %s
+                                        WHERE id = %s
                                     """, (nuevo_nombre.strip(), nuevo_margen, precio_final, precio_normalizado, prod_id))
                                 conn.commit()
                                 st.success("Producto actualizado")
@@ -584,9 +588,9 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                         if confirmar:
                             if st.button("❌ Eliminar Producto", key="btn_eliminar_prod"):
                                 try:
-                                    cursor.execute("DELETE FROM ingredientes_producto WHERE producto_id = ?", (prod_id,))
-                                    cursor.execute("DELETE FROM ventas WHERE producto_id = ?", (prod_id,))
-                                    cursor.execute("DELETE FROM productos WHERE id = ?", (prod_id,))
+                                    cursor.execute("DELETE FROM ingredientes_producto WHERE producto_id = %s", (prod_id,))
+                                    cursor.execute("DELETE FROM ventas WHERE producto_id = %s", (prod_id,))
+                                    cursor.execute("DELETE FROM productos WHERE id = %s", (prod_id,))
                                     conn.commit()
                                     st.success("Producto y registros asociados eliminados correctamente.")
                                     st.rerun()
@@ -608,7 +612,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
 
                         cursor.execute("""
                                 INSERT INTO productos (nombre, margen, categoria_id, subcategoria_id, precio_costo, precio_final, precio_normalizado)
-                                VALUES (?, ?, ?, ?, ?, ?, ?)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s)
                             """, (
                             nuevo_nombre.strip(), nuevo_margen,
                             cat_df[cat_df["nombre"] == cat_sel]["id"].values[0],
@@ -639,7 +643,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
             sub_df = pd.read_sql_query("""
                     SELECT sp.id, sp.nombre FROM subcategorias_productos sp
                     JOIN categoria_productos cp ON sp.categoria_id = cp.id
-                    WHERE cp.nombre = ?
+                    WHERE cp.nombre = %s
                 """, conn, params=(cat_sel,))
             sub_dict = dict(zip(sub_df["nombre"], sub_df["id"]))
 
@@ -648,7 +652,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                 sub_id = sub_dict[sub_sel]
 
                 prod_df = pd.read_sql_query(
-                    "SELECT id, nombre FROM productos WHERE subcategoria_id = ?", conn, params=(sub_id,))
+                    "SELECT id, nombre FROM productos WHERE subcategoria_id = %s", conn, params=(sub_id,))
                 prod_dict = dict(zip(prod_df["nombre"], prod_df["id"]))
 
 
@@ -665,7 +669,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                                (mp.precio_por_unidad * ip.cantidad_usada) AS costo
                         FROM ingredientes_producto ip
                         JOIN materias_primas mp ON ip.materia_prima_id = mp.id
-                        WHERE ip.producto_id = ?
+                        WHERE ip.producto_id = %s
                     """
                     ingredientes_df = pd.read_sql_query(query, conn, params=(prod_id,))
 
@@ -699,8 +703,8 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                                     try:
                                         cursor.execute("""
                                             UPDATE ingredientes_producto
-                                            SET cantidad_usada = ?
-                                            WHERE producto_id = ? AND materia_prima_id = ?
+                                            SET cantidad_usada = %s
+                                            WHERE producto_id = %s AND materia_prima_id = %s
                                         """, (row["cantidad_usada"], prod_id, row["id"]))
                                         conn.commit()
                                         cambios += 1
@@ -721,7 +725,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                         ing_df = pd.read_sql_query("""
                                 SELECT mp.id, mp.nombre FROM ingredientes_producto ip
                                 JOIN materias_primas mp ON ip.materia_prima_id = mp.id
-                                WHERE ip.producto_id = ?
+                                WHERE ip.producto_id = %s
                             """, conn, params=(prod_id,))
                         ing_dict = dict(zip(ing_df["nombre"], ing_df["id"]))
 
@@ -731,14 +735,14 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                         mp_info = pd.read_sql_query("""
                                 SELECT unidad, cantidad_usada FROM ingredientes_producto ip
                                 JOIN materias_primas mp ON ip.materia_prima_id = mp.id
-                                WHERE ip.producto_id = ? AND mp.id = ?
+                                WHERE ip.producto_id = %s AND mp.id = %s
                             """, conn, params=(prod_id, mp_id)).iloc[0]
 
                         if st.button("Eliminar ingrediente", key="btn_eliminar_ing"):
                             try:
                                 cursor.execute("""
                                           DELETE FROM ingredientes_producto
-                                          WHERE producto_id = ? AND materia_prima_id = ?
+                                          WHERE producto_id = %s AND materia_prima_id = %s
                                       """, (prod_id, mp_id))
                                 conn.commit()
                                 st.success("Ingrediente eliminado")
@@ -756,7 +760,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                     sub_mp_df = pd.read_sql_query("""
                             SELECT sub.id, sub.nombre FROM subcategorias_mp sub
                             JOIN categorias_mp cat ON sub.categoria_id = cat.id
-                            WHERE cat.nombre = ?
+                            WHERE cat.nombre = %s
                         """, conn, params=(cat_mp_sel,))
                     sub_mp_dict = dict(zip(sub_mp_df["nombre"], sub_mp_df["id"]))
 
@@ -765,7 +769,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                         sub_mp_id = sub_mp_dict[sub_mp_sel]
 
                         mp_df = pd.read_sql_query(
-                            "SELECT id, nombre, unidad FROM materias_primas WHERE subcategoria_id = ?", conn,
+                            "SELECT id, nombre, unidad FROM materias_primas WHERE subcategoria_id = %s", conn,
                             params=(sub_mp_id,))
                         mp_dict = dict(zip(mp_df["nombre"], mp_df["id"]))
 
@@ -780,7 +784,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                                 try:
                                     cursor.execute("""
                                             INSERT INTO ingredientes_producto (producto_id, materia_prima_id, cantidad_usada)
-                                            VALUES (?, ?, ?)
+                                            VALUES (%s, %s, %s)
                                         """, (prod_id, mp_id, cant_usada))
                                     conn.commit()
                                     st.success("Ingrediente agregado")
@@ -797,7 +801,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                     # --- BOTÓN PARA ACTUALIZAR COSTO ---
                     if st.button("Actualizar costo total del producto", key="actualizar_costo_prod"):
                         try:
-                            cursor.execute("UPDATE productos SET precio_costo = ? WHERE id = ?", (costo_total, prod_id))
+                            cursor.execute("UPDATE productos SET precio_costo = %s WHERE id = %s", (costo_total, prod_id))
                             conn.commit()
                             st.success("Precio de costo actualizado en el producto")
                             st.rerun()
@@ -907,7 +911,7 @@ elif seccion == "💵 Movimientos":
 
                             cursor.execute("""
                                 INSERT INTO ventas (producto_id, cantidad, tipo_pago, fecha, precio_unitario, descripcion)
-                                VALUES (?, ?, ?, ?, ?, ?)
+                                VALUES (%s, %s, %s, %s, %s, %s)
                             """, (producto_id, cantidad, tipo_pago, str(fecha_actual), total_unitario, descripcion_libre))
                             conn.commit()
                             st.success(
@@ -931,7 +935,7 @@ elif seccion == "💵 Movimientos":
                 else:
                     cursor.execute("""
                         INSERT INTO gastos (descripcion, monto, categoria, fecha)
-                        VALUES (?, ?, ?, ?)
+                        VALUES (%s, %s, %s, %s)
                     """, (descripcion.strip(), monto, categoria, fecha.isoformat()))
                     conn.commit()
                     st.success("✅ Gasto registrado correctamente.")
@@ -970,7 +974,7 @@ elif seccion == "📉 Historial":
                        (v.cantidad * v.precio_unitario) AS total
                 FROM ventas v
                 LEFT JOIN productos p ON v.producto_id = p.id
-                WHERE v.fecha BETWEEN ? AND ?
+                WHERE v.fecha BETWEEN %s AND %s
                 ORDER BY v.fecha DESC
             """, conn, params=(str(fecha_desde), str(fecha_hasta)))
 
@@ -995,7 +999,7 @@ elif seccion == "📉 Historial":
                 SELECT v.id, v.fecha, p.nombre AS producto, v.cantidad, (v.precio_unitario * v.cantidad) AS total
                 FROM ventas v
                 JOIN productos p ON v.producto_id = p.id
-                WHERE v.fecha BETWEEN ? AND ?
+                WHERE v.fecha BETWEEN %s AND %s
                 ORDER BY v.fecha DESC
             """, conn, params=(str(fecha_desde), str(fecha_hasta)))
 
@@ -1013,7 +1017,7 @@ elif seccion == "📉 Historial":
 
             if st.button("❌ Eliminar esta venta", key="btn_eliminar_venta"):
                 try:
-                    cursor.execute("DELETE FROM ventas WHERE id = ?", (venta_id,))
+                    cursor.execute("DELETE FROM ventas WHERE id = %s", (venta_id,))
                     conn.commit()
                     st.success(f"Venta ID {venta_id} eliminada correctamente.")
                     st.rerun()
@@ -1037,7 +1041,7 @@ elif seccion == "📉 Historial":
         else:
             gastos_df = pd.read_sql_query("""
                 SELECT * FROM gastos
-                WHERE fecha BETWEEN ? AND ?
+                WHERE fecha BETWEEN %s AND %s
                 ORDER BY fecha DESC
             """, conn, params=(str(fecha_desde), str(fecha_hasta)))
 
@@ -1086,14 +1090,14 @@ elif seccion == "📉 Historial":
                 ventas_df = pd.read_sql_query("""
                     SELECT SUBSTR(fecha, 1, 7) AS periodo, SUM(cantidad * precio_unitario) AS ventas
                     FROM ventas
-                    WHERE fecha BETWEEN ? AND ?
+                    WHERE fecha BETWEEN %s AND %s
                     GROUP BY periodo
                     ORDER BY periodo
                 """, conn, params=(str(fecha_desde), str(fecha_hasta)))
                 gastos_df = pd.read_sql_query("""
                     SELECT SUBSTR(fecha, 1, 7) AS periodo, SUM(monto) AS gastos
                     FROM gastos
-                    WHERE fecha BETWEEN ? AND ?
+                    WHERE fecha BETWEEN %s AND %s
                     GROUP BY periodo
                     ORDER BY periodo
                 """, conn, params=(str(fecha_desde), str(fecha_hasta)))
@@ -1101,14 +1105,14 @@ elif seccion == "📉 Historial":
                 ventas_df = pd.read_sql_query("""
                     SELECT fecha AS periodo, SUM(cantidad * precio_unitario) AS ventas
                     FROM ventas
-                    WHERE fecha BETWEEN ? AND ?
+                    WHERE fecha BETWEEN %s AND %s
                     GROUP BY periodo
                     ORDER BY periodo
                 """, conn, params=(str(fecha_desde), str(fecha_hasta)))
                 gastos_df = pd.read_sql_query("""
                     SELECT fecha AS periodo, SUM(monto) AS gastos
                     FROM gastos
-                    WHERE fecha BETWEEN ? AND ?
+                    WHERE fecha BETWEEN %s AND %s
                     GROUP BY periodo
                     ORDER BY periodo
                 """, conn, params=(str(fecha_desde), str(fecha_hasta)))
@@ -1157,7 +1161,7 @@ elif seccion == "📉 Historial":
             SELECT p.nombre AS producto, SUM(v.cantidad) AS unidades, SUM(v.cantidad * v.precio_unitario) AS total_ventas
             FROM ventas v
             JOIN productos p ON v.producto_id = p.id
-            WHERE v.fecha BETWEEN ? AND ?
+            WHERE v.fecha BETWEEN %s AND %s
             GROUP BY p.nombre
             ORDER BY total_ventas DESC
         """, conn, params=(str(fecha_desde), str(fecha_hasta)))
@@ -1201,7 +1205,7 @@ elif seccion == "📉 Historial":
                 SUM(v.cantidad * (v.precio_unitario - p.precio_costo)) AS ganancia
             FROM ventas v
             JOIN productos p ON v.producto_id = p.id
-            WHERE v.fecha BETWEEN ? AND ?
+            WHERE v.fecha BETWEEN %s AND %s
             GROUP BY p.nombre
             ORDER BY ganancia DESC
         """, conn, params=(str(fecha_desde), str(fecha_hasta)))
@@ -1245,7 +1249,7 @@ elif seccion == "🧪 Simulador de productos":
         sub_mp_df = pd.read_sql_query("""
             SELECT sub.id, sub.nombre FROM subcategorias_mp sub
             JOIN categorias_mp cat ON sub.categoria_id = cat.id
-            WHERE cat.nombre = ?
+            WHERE cat.nombre = %s
         """, conn, params=(cat_mp_sel,))
         sub_mp_dict = dict(zip(sub_mp_df["nombre"], sub_mp_df["id"]))
 
@@ -1254,7 +1258,7 @@ elif seccion == "🧪 Simulador de productos":
             sub_mp_id = sub_mp_dict[sub_mp_sel]
 
             mp_df = pd.read_sql_query(
-                "SELECT id, nombre, unidad, precio_por_unidad FROM materias_primas WHERE subcategoria_id = ?", conn, params=(sub_mp_id,))
+                "SELECT id, nombre, unidad, precio_por_unidad FROM materias_primas WHERE subcategoria_id = %s", conn, params=(sub_mp_id,))
             mp_dict = dict(zip(mp_df["nombre"], mp_df["id"]))
 
             if mp_dict:
