@@ -2,10 +2,10 @@
 # Streamlit app local para gestión de costos de Chokoreto con SQLite
 import streamlit as st
 import pandas as pd
-#from datetime import date
+from datetime import date
 import math
 import numpy as np
-from dotenv import load_dotenv
+#from dotenv import load_dotenv
 import os
 import psycopg2
 
