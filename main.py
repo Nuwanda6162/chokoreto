@@ -2,7 +2,7 @@
 # Streamlit app local para gestión de costos de Chokoreto con SQLite
 import streamlit as st
 import pandas as pd
-from datetime import date
+#from datetime import date
 import math
 import numpy as np
 from dotenv import load_dotenv
@@ -16,7 +16,7 @@ import psycopg2
 
 # Conectar a la base Supabase
 
-load_dotenv()  # Esto carga el .env
+#load_dotenv()  # Esto carga el .env
 
 conn = psycopg2.connect(
     host=os.getenv("DB_HOST"),
