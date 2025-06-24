@@ -1333,7 +1333,7 @@ elif seccion == "🧪 Simulador de productos":
         # Calcula costo total, margen y precios
         costo_total = sim_df["costo"].sum()
         margen = st.number_input("Margen de ganancia", min_value=0.1, value=3.0, step=0.1, key="simulador_margen")
-        descuento = st.number_input("Descuento (%)", min_value=0.0, max_value=100.0, value=0.0, step=5,key="simulador_descuento")
+        descuento = st.number_input("Descuento (%)", min_value=0.0, max_value=100.0, value=0.0, step=0.1, key="simulador_descuento")
         precio_final = round(costo_total * margen, 2)
         try:
             precio_normalizado = redondeo_personalizado(precio_final)
@@ -1346,8 +1346,10 @@ elif seccion == "🧪 Simulador de productos":
 
         st.dataframe(sim_df[["nombre", "unidad", "cantidad_usada", "precio_por_unidad", "costo"]])
         st.info(f"🧮 **Costo total:** ${costo_total:.2f}")
-        st.info(f"💲 **Precio sugerido de venta:** ${precio_normalizado:.2f}")
-        st.info(f"💰 **Ganancia estimada:** ${ganancia:.2f}")
+        st.info(f"💲 **Precio sugerido de venta (sin descuento):** ${precio_normalizado:.2f}")
+        st.info(f"💲 **Precio con descuento aplicado:** ${precio_con_descuento:.2f}")
+        st.info(f"💰 **Ganancia estimada (con descuento):** ${ganancia:.2f}")
+
 
         # Botón para limpiar simulación
         if st.button("Limpiar simulación"):
