@@ -1,15 +1,30 @@
 
 # Streamlit app local para gestión de costos de Chokoreto con SQLite
 import streamlit as st
-import sqlite3
 import pandas as pd
 from datetime import date
 import math
 import numpy as np
 
 # Conectar a la base SQLite local
-conn = sqlite3.connect("chokoreto_costos.db", check_same_thread=False)
+#import sqlite3
+#conn = sqlite3.connect("chokoreto_costos.db", check_same_thread=False)
+#cursor = conn.cursor()
+
+# Conectar a la base Supabase
+import psycopg2
+
+conn = psycopg2.connect(
+    host="db.ziuxwxlpqtdxyojpzhqs.supabase.co",
+    port=5432,
+    dbname="postgres",
+    user="postgres",
+    password="WOOoc8hgs0ulXNjU"
+)
 cursor = conn.cursor()
+cursor.execute("SELECT * FROM categoria_productos;")
+print(cursor.fetchall())
+conn.close()
 
 
 # Funcion de redondeo
