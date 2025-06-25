@@ -1323,8 +1323,8 @@ elif seccion == "🧪 Simulador de productos":
                             "precio_por_unidad": precio_por_unidad,
                             "costo": round(cant_usada * precio_por_unidad, 2)
                         })
-                    # --- Resetea cantidad a 1.0 para sumar más fácil ---
-                    st.session_state["sim_cant_usada"] = 1.0
+#                    # --- Resetea cantidad a 1.0 para sumar más fácil ---
+#                    st.session_state["sim_cant_usada"] = 1.0
     
     # --- Tabla editable de ingredientes simulados (mostrar siempre, aunque esté vacía) ---
     sim_df = pd.DataFrame(st.session_state["simulador_ingredientes"])
