@@ -1349,8 +1349,8 @@ elif seccion == "🧪 Simulador de productos":
                 st.session_state["simulador_ingredientes"][idx]["cantidad_usada"] = row["cantidad_usada"]
                 st.session_state["simulador_ingredientes"][idx]["costo"] = round(row["cantidad_usada"] * row["precio_por_unidad"], 2)
                 cambios = True
-        if cambios:
-            sim_df = pd.DataFrame(st.session_state["simulador_ingredientes"])
+#        if cambios:
+#            sim_df = pd.DataFrame(st.session_state["simulador_ingredientes"])
     
         ingr_a_borrar = st.selectbox("Eliminar ingrediente de la simulación", sim_df["nombre"].tolist(), key="simulador_borrar")
         if st.button("Eliminar ingrediente seleccionado"):
