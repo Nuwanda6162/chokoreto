@@ -1370,11 +1370,14 @@ elif seccion == "🧪 Simulador de productos":
     precio_con_descuento = round(precio_normalizado * (1 - descuento / 100), 2)
     ganancia = precio_con_descuento - costo_total
     
-    st.dataframe(sim_df[["nombre", "unidad", "cantidad_usada", "precio_por_unidad", "costo"]])
-    st.info(f"🧮 **Costo total:** ${costo_total:.2f}")
-    st.info(f"💲 **Precio sugerido de venta (sin descuento):** ${precio_normalizado:.2f}")
-    st.info(f"💲 **Precio con descuento aplicado:** ${precio_con_descuento:.2f}")
-    st.info(f"💰 **Ganancia estimada (con descuento):** ${ganancia:.2f}")
+    if not sim_df.empty:
+        st.dataframe(sim_df[["nombre", "unidad", "cantidad_usada", "precio_por_unidad", "costo"]])
+        st.info(f"🧮 **Costo total:** ${costo_total:.2f}")
+        st.info(f"💲 **Precio sugerido de venta (sin descuento):** ${precio_normalizado:.2f}")
+        st.info(f"💲 **Precio con descuento aplicado:** ${precio_con_descuento:.2f}")
+        st.info(f"💰 **Ganancia estimada (con descuento):** ${ganancia:.2f}")
+    else:
+        st.info("Sumá ingredientes para simular el costo y precio.")
     
     if st.button("Limpiar simulación"):
         st.session_state["simulador_ingredientes"] = []
