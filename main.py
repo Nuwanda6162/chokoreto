@@ -1274,6 +1274,8 @@ elif seccion == "🧪 Simulador de productos":
     
     if "simulador_ingredientes" not in st.session_state:
         st.session_state["simulador_ingredientes"] = []
+    if "sim_cant_usada" not in st.session_state:
+        st.session_state["sim_cant_usada"] = 1.0
     
     # --- Agregar ingrediente a la simulación ---
     cat_mp_df = pd.read_sql_query("SELECT * FROM categorias_mp", conn)
@@ -1381,4 +1383,6 @@ elif seccion == "🧪 Simulador de productos":
     
     if st.button("Limpiar simulación"):
         st.session_state["simulador_ingredientes"] = []
+        # Asegura que la variable exista tras el rerun
+        st.session_state["sim_cant_usada"] = 1.0
         st.experimental_rerun()
