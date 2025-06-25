@@ -1274,8 +1274,8 @@ elif seccion == "🧪 Simulador de productos":
     
     if "simulador_ingredientes" not in st.session_state:
         st.session_state["simulador_ingredientes"] = []
-    if "sim_cant_usada" not in st.session_state:
-        st.session_state["sim_cant_usada"] = 1.0
+#    if "sim_cant_usada" not in st.session_state:
+#        st.session_state["sim_cant_usada"] = 1.0
     
     # --- Agregar ingrediente a la simulación ---
     cat_mp_df = pd.read_sql_query("SELECT * FROM categorias_mp", conn)
