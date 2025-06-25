@@ -1166,8 +1166,6 @@ elif seccion == "📉 Historial":
 
         if fecha_desde > fecha_hasta:
             st.warning("La fecha inicial no puede ser posterior a la final.")
-        else:
-            import matplotlib.pyplot as plt
 
         modo_agrupacion = st.radio("Agrupar datos por:", ["Día", "Mes"], horizontal=True)
 
