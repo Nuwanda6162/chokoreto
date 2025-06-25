@@ -1269,15 +1269,18 @@ elif seccion == "📉 Historial":
 elif seccion == "🧪 Simulador de productos":
 
     st.title("🧪 Simulador de costo y precio de producto")
-
+    
+    st.info("💡 *Usá este simulador para experimentar con recetas, ver cuánto costaría un producto nuevo o ajustar una receta existente. Agregá ingredientes, modificá cantidades y márgenes. **Nada se guarda**: es solo para probar.*")
+    
     if "simulador_ingredientes" not in st.session_state:
         st.session_state["simulador_ingredientes"] = []
-
+    
     # --- Agregar ingrediente a la simulación ---
     cat_mp_df = pd.read_sql_query("SELECT * FROM categorias_mp", conn)
     if cat_mp_df.empty:
         st.warning("No hay categorías de materias primas.")
     else:
+        # --- Cambiá el flujo: primero selectbox de MP, luego cantidad, luego agregar ---
         cat_mp_sel = st.selectbox("Categoría de MP", cat_mp_df["nombre"].tolist(), key="sim_cat_mp")
         sub_mp_df = pd.read_sql_query("""
             SELECT sub.id, sub.nombre FROM subcategorias_mp sub
@@ -1285,24 +1288,24 @@ elif seccion == "🧪 Simulador de productos":
             WHERE cat.nombre = %s
         """, conn, params=(cat_mp_sel,))
         sub_mp_dict = dict(zip(sub_mp_df["nombre"], sub_mp_df["id"]))
-
+    
         if sub_mp_dict:
             sub_mp_sel = st.selectbox("Subcategoría de MP", sorted(sub_mp_dict.keys()), key="sim_subcat_mp")
             sub_mp_id = sub_mp_dict[sub_mp_sel]
-
+    
             mp_df = pd.read_sql_query(
                 "SELECT id, nombre, unidad, precio_por_unidad FROM materias_primas WHERE subcategoria_id = %s", conn, params=(sub_mp_id,))
             mp_dict = dict(zip(mp_df["nombre"], mp_df["id"]))
-
+    
             if mp_dict:
                 mp_sel = st.selectbox("Materia Prima", sorted(mp_dict.keys()), key="sim_ingred_mp_sel")
                 mp_row = mp_df[mp_df["nombre"] == mp_sel].iloc[0]
                 unidad = mp_row["unidad"]
                 precio_por_unidad = mp_row["precio_por_unidad"]
+                # --- Siempre default 1.0 ---
                 cant_usada = st.number_input(f"Cantidad usada ({unidad})", min_value=0.0, value=1.0, step=0.1, key="sim_cant_usada")
-
+    
                 if st.button("Agregar a simulación"):
-                    # Ver si ya existe y suma cantidades
                     repetido = False
                     for ing in st.session_state["simulador_ingredientes"]:
                         if ing["nombre"] == mp_sel:
@@ -1318,11 +1321,13 @@ elif seccion == "🧪 Simulador de productos":
                             "precio_por_unidad": precio_por_unidad,
                             "costo": round(cant_usada * precio_por_unidad, 2)
                         })
-
-    # --- Tabla editable de ingredientes simulados ---
-    if st.session_state["simulador_ingredientes"]:
-        sim_df = pd.DataFrame(st.session_state["simulador_ingredientes"])
-        st.subheader("Ingredientes simulados")
+                    # --- Resetea cantidad a 1.0 para sumar más fácil ---
+                    st.session_state["sim_cant_usada"] = 1.0
+    
+    # --- Tabla editable de ingredientes simulados (mostrar siempre, aunque esté vacía) ---
+    sim_df = pd.DataFrame(st.session_state["simulador_ingredientes"])
+    st.subheader("Ingredientes simulados")
+    if not sim_df.empty:
         edited = st.data_editor(
             sim_df,
             column_config={
@@ -1335,7 +1340,6 @@ elif seccion == "🧪 Simulador de productos":
             num_rows="dynamic",
             key="simulador_editor"
         )
-
         # Sincroniza cambios de cantidad
         cambios = False
         for idx, row in edited.iterrows():
@@ -1345,39 +1349,33 @@ elif seccion == "🧪 Simulador de productos":
                 cambios = True
         if cambios:
             sim_df = pd.DataFrame(st.session_state["simulador_ingredientes"])
-
-        # Botón para eliminar ingrediente
+    
         ingr_a_borrar = st.selectbox("Eliminar ingrediente de la simulación", sim_df["nombre"].tolist(), key="simulador_borrar")
         if st.button("Eliminar ingrediente seleccionado"):
             st.session_state["simulador_ingredientes"] = [ing for ing in st.session_state["simulador_ingredientes"] if ing["nombre"] != ingr_a_borrar]
             st.experimental_rerun()
-
-        # Calcula costo total, margen y precios
-        costo_total = sim_df["costo"].sum()
-        margen = st.number_input("Margen de ganancia", min_value=0.1, value=3.0, step=0.1, key="simulador_margen")
-        descuento = st.number_input("Descuento (%)", min_value=0.0, max_value=100.0, value=0.0, step=0.1, key="simulador_descuento")
-        precio_final = round(costo_total * margen, 2)
-        try:
-            precio_normalizado = redondeo_personalizado(precio_final)
-        except:
-            precio_normalizado = precio_final
-
-        precio_con_descuento = round(precio_normalizado * (1 - descuento / 100), 2)
-        ganancia = precio_con_descuento - costo_total
-        #ganancia = precio_normalizado - costo_total
-
-        st.dataframe(sim_df[["nombre", "unidad", "cantidad_usada", "precio_por_unidad", "costo"]])
-        st.info(f"🧮 **Costo total:** ${costo_total:.2f}")
-        st.info(f"💲 **Precio sugerido de venta (sin descuento):** ${precio_normalizado:.2f}")
-        st.info(f"💲 **Precio con descuento aplicado:** ${precio_con_descuento:.2f}")
-        st.info(f"💰 **Ganancia estimada (con descuento):** ${ganancia:.2f}")
-
-
-        # Botón para limpiar simulación
-        if st.button("Limpiar simulación"):
-            st.session_state["simulador_ingredientes"] = []
-            st.experimental_rerun()
     else:
-        st.info("Agregá ingredientes y cantidades para simular el costo y precio del producto.")
-
-    st.caption("Todo lo que hagas acá es SOLO simulación. No se guarda nada en la base.")
+        st.info("Sumá ingredientes para simular el costo y precio.")
+    
+    # --- Calcula costo total, margen y precios ---
+    costo_total = sim_df["costo"].sum() if not sim_df.empty else 0.0
+    margen = st.number_input("Margen de ganancia", min_value=0.1, value=3.0, step=0.1, key="simulador_margen")
+    descuento = st.number_input("Descuento (%)", min_value=0.0, max_value=100.0, value=0.0, step=0.1, key="simulador_descuento")
+    precio_final = round(costo_total * margen, 2)
+    try:
+        precio_normalizado = redondeo_personalizado(precio_final)
+    except:
+        precio_normalizado = precio_final
+    
+    precio_con_descuento = round(precio_normalizado * (1 - descuento / 100), 2)
+    ganancia = precio_con_descuento - costo_total
+    
+    st.dataframe(sim_df[["nombre", "unidad", "cantidad_usada", "precio_por_unidad", "costo"]])
+    st.info(f"🧮 **Costo total:** ${costo_total:.2f}")
+    st.info(f"💲 **Precio sugerido de venta (sin descuento):** ${precio_normalizado:.2f}")
+    st.info(f"💲 **Precio con descuento aplicado:** ${precio_con_descuento:.2f}")
+    st.info(f"💰 **Ganancia estimada (con descuento):** ${ganancia:.2f}")
+    
+    if st.button("Limpiar simulación"):
+        st.session_state["simulador_ingredientes"] = []
+        st.experimental_rerun()
