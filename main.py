@@ -836,13 +836,9 @@ elif seccion == "💵 Movimientos":
         "Registrar Gastos"
     ])
     with tab1:
-        st.title("📦 Registrar Venta")
+        st.title("📦 Registrar Venta (Rápido)")
         
-        # Mostrar último registro exitoso
-        if "ultima_venta" in st.session_state:
-            st.success(f"Última venta: {st.session_state['ultima_venta']}")
-        
-        # 1. Cargar todos los productos y sus datos asociados
+        # 1. Traer productos y armar buscador
         productos_full = pd.read_sql_query("""
             SELECT p.id, p.nombre, p.precio_normalizado, 
                    sp.nombre AS subcategoria, cp.nombre AS categoria
@@ -854,9 +850,9 @@ elif seccion == "💵 Movimientos":
         if productos_full.empty:
             st.warning("No hay productos cargados.")
         else:
-            # Buscador rápido
+            # --- Buscador y selección de producto ---
             busqueda = st.text_input(
-                "Buscar producto (nombre, subcategoría o categoría):", 
+                "Buscar producto (nombre, subcategoría o categoría):",
                 value="", key="busqueda_venta"
             ).lower()
             if busqueda:
@@ -871,67 +867,86 @@ elif seccion == "💵 Movimientos":
             if productos_filtrados.empty:
                 st.warning("No se encontraron productos que coincidan.")
             else:
-                opciones = productos_filtrados["nombre"] + " [" + productos_filtrados["categoria"] + " / " + \
-                           productos_filtrados["subcategoria"] + "]"
+                opciones = productos_filtrados["nombre"] + " [" + productos_filtrados["categoria"] + " / " + productos_filtrados["subcategoria"] + "]"
                 prod_idx = st.selectbox("Seleccioná el producto", opciones.tolist(), key="prod_busqueda")
                 producto = productos_filtrados.iloc[opciones.tolist().index(prod_idx)]
         
-                st.info(f"**Categoría:** {producto['categoria']}  |  **Subcategoría:** {producto['subcategoria']}")
-                st.info(f"**Precio unitario:** ${producto['precio_normalizado']:.2f}")
+                precio_actual = float(producto['precio_normalizado'])
+                categoria = producto['categoria']
+                subcategoria = producto['subcategoria']
         
-                precio_actual = producto['precio_normalizado']
+                # --- Columnas para campos principales ---
+                col1, col2, col3 = st.columns([1, 1, 1])
+                with col1:
+                    cantidad = st.number_input("Cantidad", min_value=1, value=1, step=1, key="cant_venta")
+                with col2:
+                    tipo_pago_default = st.session_state.get("tipo_pago", "Efectivo")
+                    tipo_pago = st.selectbox(
+                        "Tipo de pago", ["Efectivo", "Otros"],
+                        key="pago_venta",
+                        index=0 if tipo_pago_default == "Efectivo" else 1
+                    )
+                with col3:
+                    # Resumen visual principal
+                    st.markdown(
+                        f"""
+                        <div style="background:#e6f7ff; padding:10px 20px; border-radius:8px; border:1px solid #91d5ff;">
+                        <b>Precio unitario:</b> ${precio_actual:,.2f}<br>
+                        <b>Categoría:</b> {categoria}<br>
+                        <b>Subcategoría:</b> {subcategoria}
+                        </div>
+                        """, unsafe_allow_html=True
+                    )
         
-                # Default cantidad 1
-                cantidad = st.number_input(
-                    "Cantidad vendida", min_value=1, value=1, step=1, key="cant_venta"
-                )
+                # --- Expander para opciones avanzadas ---
+                with st.expander("Opciones avanzadas (descuento, fecha, descripción)"):
+                    descuento = st.number_input(
+                        "Descuento (%)", min_value=0.0, max_value=100.0, value=0.0, step=0.5, key="desc_venta"
+                    )
+                    fecha_actual = st.date_input("Fecha de actualización", key="fecha_new")
+                    descripcion_libre = st.text_area("Descripción (ej: reserva, evento, nota)", key="desc_libre")
         
-                # Recordar tipo de pago anterior
-                tipo_pago_default = st.session_state.get("tipo_pago", "Efectivo")
-                tipo_pago = st.selectbox(
-                    "Tipo de pago", ["Efectivo", "Otros"],
-                    key="pago_venta",
-                    index=0 if tipo_pago_default == "Efectivo" else 1
-                )
-        
-                descuento = st.number_input(
-                    "Descuento (%)", min_value=0.0, max_value=100.0, value=0.0, step=0.5, key="desc_venta"
-                )
-                fecha_actual = st.date_input("Fecha de actualización", key="fecha_new")
-        
-                # Calculo con descuento
+                # --- Cálculo de totales con descuento ---
                 precio_unitario_con_descuento = round(precio_actual * (1 - descuento / 100), 2)
                 total = round(precio_unitario_con_descuento * cantidad, 2)
         
-                st.info(f"💲 Precio unitario actual: **${precio_actual:.2f}**")
-                if descuento > 0:
-                    st.info(f"💲 Precio unitario con descuento: **${precio_unitario_con_descuento:.2f}**")
-                st.info(f"💰 Total de esta venta: **${total:.2f}**")
+                # --- Resumen de la venta actual, siempre arriba ---
+                st.markdown(
+                    f"""
+                    <div style="background:#e6ffed; padding:10px 20px; border-radius:8px; border:1px solid #b2f2bb; margin-bottom:10px;">
+                        <span style="font-size:1.2em;">💲 <b>Precio final unitario:</b> ${precio_unitario_con_descuento:,.2f}</span><br>
+                        <span style="font-size:1.2em;">💰 <b>Total de esta venta:</b> ${total:,.2f}</span>
+                    </div>
+                    """, unsafe_allow_html=True
+                )
         
-                descripcion_libre = ""
-                if producto["nombre"].lower() in ["ingreso libre", "varios", "reserva", "otros"]:
-                    st.info("Estás registrando una venta de tipo ingreso libre.")
-                    descripcion_libre = st.text_area("Descripción (ej: reserva, seña, evento, etc.)")
+                # --- Botón bien arriba ---
+                btn_cols = st.columns([3, 1, 3])
+                with btn_cols[1]:
+                    if st.button("🟢 Registrar Venta", key="btn_guardar_venta"):
+                        try:
+                            if not producto['id'] or cantidad <= 0:
+                                st.error("❌ Completá todos los datos de la venta.")
+                            else:
+                                producto_id = int(producto['id'])
+                                precio_unitario_con_descuento = float(precio_unitario_con_descuento)
+                                import datetime
+                                fecha_str = str(fecha_actual)
+                                cursor.execute("""
+                                    INSERT INTO ventas (producto_id, cantidad, tipo_pago, fecha, precio_unitario, descripcion)
+                                    VALUES (%s, %s, %s, %s, %s, %s)
+                                """, (producto_id, cantidad, tipo_pago, fecha_str, precio_unitario_con_descuento, descripcion_libre))
+                                conn.commit()
+                                st.session_state["tipo_pago"] = tipo_pago
+                                st.session_state['ultima_venta'] = f"{cantidad} × {producto['nombre']} ({categoria} / {subcategoria}) – ${total:,.2f} el {fecha_str}"
+                                st.success(f"✅ Venta registrada: {cantidad} × {producto['nombre']} – ${total:,.2f}")
+                                st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Ocurrió un error al registrar la venta: {e}")
         
-                if st.button("Registrar Venta", key="btn_guardar_venta"):
-                    try:
-                        if not producto['id'] or cantidad <= 0:
-                            st.error("❌ Completá todos los datos de la venta.")
-                        else:
-                            producto_id = int(producto['id'])
-                            # Convertir valores a float estándar de Python
-                            precio_unitario_con_descuento = float(precio_unitario_con_descuento)
-                            cursor.execute("""
-                                INSERT INTO ventas (producto_id, cantidad, tipo_pago, fecha, precio_unitario, descripcion)
-                                VALUES (%s, %s, %s, %s, %s, %s)
-                            """, (producto_id, cantidad, tipo_pago, str(fecha_actual), precio_unitario_con_descuento, descripcion_libre))
-                            conn.commit()
-                            st.session_state["tipo_pago"] = tipo_pago
-                            st.session_state['ultima_venta'] = f"{cantidad} × {producto['nombre']} ({producto['categoria']} / {producto['subcategoria']}) – ${total} el {fecha_actual}"
-                            st.success(f"✅ Venta registrada: {cantidad} × {producto['nombre']} – ${total}")
-                            st.rerun()
-                    except Exception as e:
-                        st.error(f"❌ Ocurrió un error al registrar la venta: {e}")
+                # --- Mostrar la última venta registrada siempre arriba ---
+                if "ultima_venta" in st.session_state:
+                    st.info(f"Última venta: {st.session_state['ultima_venta']}")
 
     with tab2:
         # Registrar Gastos
