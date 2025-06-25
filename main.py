@@ -1008,18 +1008,18 @@ elif seccion == "📉 Historial":
     with tab1:
         # Visor de Ventas
         st.title("📈 Visor de Ventas")
-
+        
         col1, col2 = st.columns(2)
         with col1:
             fecha_desde = st.date_input("Desde", value=date.today(), key="fecha_inicio")
         with col2:
             fecha_hasta = st.date_input("Hasta", value=date.today(), key="fecha_fin")
-
+        
         if fecha_desde > fecha_hasta:
             st.warning("La fecha 'Desde' no puede ser posterior a 'Hasta'")
         else:
             ventas_df = pd.read_sql_query("""
-                SELECT v.fecha, p.nombre AS producto, v.cantidad, v.tipo_pago, v.precio_unitario,
+                SELECT v.id, v.fecha, p.nombre AS producto, v.cantidad, v.tipo_pago, v.precio_unitario,
                        (v.cantidad * v.precio_unitario) AS total,
                        v.descripcion
                 FROM ventas v
@@ -1027,54 +1027,63 @@ elif seccion == "📉 Historial":
                 WHERE v.fecha BETWEEN %s AND %s
                 ORDER BY v.fecha DESC
             """, conn, params=(str(fecha_desde), str(fecha_hasta)))
-
+        
             if ventas_df.empty:
                 st.info("No se encontraron ventas en el rango seleccionado.")
             else:
-                st.dataframe(ventas_df)
-
-                # Total por día
-                total_dia = ventas_df.groupby("fecha")["total"].sum().reset_index()
-                total_dia.columns = ["Fecha", "Total del día"]
-                st.subheader("💰 Total de ventas por día")
-                st.table(total_dia)
-
-                # Total general
-                total_general = ventas_df["total"].sum()
-                st.success(f"🧮 Total del período: **${round(total_general, 2)}**")
-
-        # --- OPCIÓN PARA ELIMINAR UNA VENTA ---
-        st.subheader("🗑️ Eliminar una venta puntual")
-        ventas_id_df = pd.read_sql_query("""
-                SELECT v.id, v.fecha, p.nombre AS producto, v.cantidad, (v.precio_unitario * v.cantidad) AS total
-                FROM ventas v
-                JOIN productos p ON v.producto_id = p.id
-                WHERE v.fecha BETWEEN %s AND %s
-                ORDER BY v.fecha DESC
-            """, conn, params=(str(fecha_desde), str(fecha_hasta)))
-
-        if not ventas_id_df.empty:
-            ventas_id_df["info"] = (
-                    "ID " + ventas_id_df["id"].astype(str) +
-                    " – " + ventas_id_df["producto"] +
-                    " – " + ventas_id_df["fecha"] +
-                    " – $" + ventas_id_df["total"].round(2).astype(str)
-            )
-            venta_dict = dict(zip(ventas_id_df["info"], ventas_id_df["id"]))
-
-            venta_sel = st.selectbox("Seleccioná la venta a eliminar", list(venta_dict.keys()), key="venta_del_sel")
-            venta_id = venta_dict[venta_sel]
-
-            if st.button("❌ Eliminar esta venta", key="btn_eliminar_venta"):
-                try:
-                    cursor.execute("DELETE FROM ventas WHERE id = %s", (venta_id,))
-                    conn.commit()
-                    st.success(f"Venta ID {venta_id} eliminada correctamente.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"❌ Ocurrió un error al eliminar la venta: {e}")
-        else:
-            st.info("No hay ventas para eliminar en este rango.")
+                # ---------------------------
+                # Campo de búsqueda (producto o descripción)
+                busqueda_ventas = st.text_input("🔍 Buscar en ventas (producto o descripción):", value="", key="busqueda_ventas")
+        
+                if busqueda_ventas:
+                    ventas_filtradas = ventas_df[
+                        ventas_df["producto"].str.lower().str.contains(busqueda_ventas.lower(), na=False) |
+                        ventas_df["descripcion"].str.lower().str.contains(busqueda_ventas.lower(), na=False)
+                    ]
+                else:
+                    ventas_filtradas = ventas_df
+                # ---------------------------
+        
+                if ventas_filtradas.empty:
+                    st.info("No se encontraron ventas que coincidan con la búsqueda.")
+                else:
+                    st.dataframe(ventas_filtradas)
+        
+                    # Totales por día (usando solo lo filtrado)
+                    total_dia = ventas_filtradas.groupby("fecha")["total"].sum().reset_index()
+                    total_dia.columns = ["Fecha", "Total del día"]
+                    st.subheader("💰 Total de ventas por día")
+                    st.table(total_dia)
+        
+                    # Total general filtrado
+                    total_general = ventas_filtradas["total"].sum()
+                    st.success(f"🧮 Total del período: **${round(total_general, 2)}**")
+        
+                    # --- OPCIÓN PARA ELIMINAR UNA VENTA SOLO SOBRE FILTRADO ---
+                    st.subheader("🗑️ Eliminar una venta puntual")
+                    # Armamos el dict sobre ventas_filtradas
+                    ventas_filtradas["info"] = (
+                        "ID " + ventas_filtradas["id"].astype(str) +
+                        " – " + ventas_filtradas["producto"] +
+                        " – " + ventas_filtradas["fecha"].astype(str) +
+                        " – $" + ventas_filtradas["total"].round(2).astype(str)
+                    )
+                    venta_dict = dict(zip(ventas_filtradas["info"], ventas_filtradas["id"]))
+        
+                    if venta_dict:
+                        venta_sel = st.selectbox("Seleccioná la venta a eliminar", list(venta_dict.keys()), key="venta_del_sel")
+                        venta_id = venta_dict[venta_sel]
+        
+                        if st.button("❌ Eliminar esta venta", key="btn_eliminar_venta"):
+                            try:
+                                cursor.execute("DELETE FROM ventas WHERE id = %s", (venta_id,))
+                                conn.commit()
+                                st.success(f"Venta ID {venta_id} eliminada correctamente.")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ Ocurrió un error al eliminar la venta: {e}")
+                    else:
+                        st.info("No hay ventas para eliminar en este resultado.")
 
     with tab2:
         # Gastos
