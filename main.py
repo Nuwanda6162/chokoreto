@@ -1166,6 +1166,21 @@ elif seccion == "📉 Historial":
 
         if fecha_desde > fecha_hasta:
             st.warning("La fecha inicial no puede ser posterior a la final.")
+        else:
+            ventas_df = pd.read_sql_query("""
+                SELECT v.fecha, p.nombre AS producto, v.cantidad, v.tipo_pago, v.precio_unitario,
+                    (v.cantidad * v.precio_unitario) AS total
+                FROM ventas v
+                LEFT JOIN productos p ON v.producto_id = p.id
+                WHERE v.fecha BETWEEN %s AND %s
+                ORDER BY v.fecha DESC
+            """, conn, params=(str(fecha_desde), str(fecha_hasta)))
+    
+            gastos_df = pd.read_sql_query("""
+                SELECT * FROM gastos
+                WHERE fecha BETWEEN %s AND %s
+                ORDER BY fecha DESC
+            """, conn, params=(str(fecha_desde), str(fecha_hasta)))        
 
         modo_agrupacion = st.radio("Agrupar datos por:", ["Día", "Mes"], horizontal=True)
 
