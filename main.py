@@ -838,7 +838,7 @@ elif seccion == "💵 Movimientos":
     with tab1:
         st.title("📦 Registrar Venta (Rápido)")
         
-        # 1. Traer productos y armar buscador
+        # Traer productos y buscador
         productos_full = pd.read_sql_query("""
             SELECT p.id, p.nombre, p.precio_normalizado, 
                    sp.nombre AS subcategoria, cp.nombre AS categoria
@@ -850,7 +850,6 @@ elif seccion == "💵 Movimientos":
         if productos_full.empty:
             st.warning("No hay productos cargados.")
         else:
-            # --- Buscador y selección de producto ---
             busqueda = st.text_input(
                 "Buscar producto (nombre, subcategoría o categoría):",
                 value="", key="busqueda_venta"
@@ -874,11 +873,24 @@ elif seccion == "💵 Movimientos":
                 precio_actual = float(producto['precio_normalizado'])
                 categoria = producto['categoria']
                 subcategoria = producto['subcategoria']
+                nombre_producto = producto["nombre"].lower()
         
-                # --- Columnas para campos principales ---
+                # Detecta si es ingreso libre o seña
+                es_ingreso_libre = any(x in nombre_producto for x in [
+                    "ingreso libre", "seña", "reserva", "adelanto", "anticipo", "varios", "otros"
+                ])
+        
+                # --- Inputs principales en columnas ---
                 col1, col2, col3 = st.columns([1, 1, 1])
                 with col1:
-                    cantidad = st.number_input("Cantidad", min_value=1, value=1, step=1, key="cant_venta")
+                    if es_ingreso_libre:
+                        importe_libre = st.number_input(
+                            "Precio/Importe recibido", min_value=1.0, value=1.0, step=1.0, key="importe_libre"
+                        )
+                    else:
+                        cantidad = st.number_input(
+                            "Cantidad", min_value=1, value=1, step=1, key="cant_venta"
+                        )
                 with col2:
                     tipo_pago_default = st.session_state.get("tipo_pago", "Efectivo")
                     tipo_pago = st.selectbox(
@@ -887,7 +899,6 @@ elif seccion == "💵 Movimientos":
                         index=0 if tipo_pago_default == "Efectivo" else 1
                     )
                 with col3:
-                    # Resumen visual principal
                     st.markdown(
                         f"""
                         <div style="background:#e6f7ff; padding:10px 20px; border-radius:8px; border:1px solid #91d5ff;">
@@ -898,34 +909,43 @@ elif seccion == "💵 Movimientos":
                         """, unsafe_allow_html=True
                     )
         
-                # --- Expander para opciones avanzadas ---
+                # --- Opciones avanzadas ---
                 with st.expander("Opciones avanzadas (descuento, fecha, descripción)"):
-                    descuento = st.number_input(
-                        "Descuento (%)", min_value=0.0, max_value=100.0, value=0.0, step=0.5, key="desc_venta"
-                    )
+                    if not es_ingreso_libre:
+                        descuento = st.number_input(
+                            "Descuento (%)", min_value=0.0, max_value=100.0, value=0.0, step=0.5, key="desc_venta"
+                        )
+                    else:
+                        descuento = 0.0
                     fecha_actual = st.date_input("Fecha de actualización", key="fecha_new")
                     descripcion_libre = st.text_area("Descripción (ej: reserva, evento, nota)", key="desc_libre")
         
-                # --- Cálculo de totales con descuento ---
-                precio_unitario_con_descuento = round(precio_actual * (1 - descuento / 100), 2)
-                total = round(precio_unitario_con_descuento * cantidad, 2)
+                # --- Cálculo de totales ---
+                if es_ingreso_libre:
+                    precio_unitario_con_descuento = float(importe_libre)
+                    cantidad_val = 1
+                else:
+                    precio_unitario_con_descuento = round(precio_actual * (1 - descuento / 100), 2)
+                    cantidad_val = cantidad
         
-                # --- Resumen de la venta actual, siempre arriba ---
+                total = round(precio_unitario_con_descuento * cantidad_val, 2)
+        
+                # --- Resumen de la venta ---
                 st.markdown(
                     f"""
                     <div style="background:#e6ffed; padding:10px 20px; border-radius:8px; border:1px solid #b2f2bb; margin-bottom:10px;">
-                        <span style="font-size:1.2em;">💲 <b>Precio final unitario:</b> ${precio_unitario_con_descuento:,.2f}</span><br>
+                        <span style="font-size:1.2em;">💲 <b>{'Importe ingresado' if es_ingreso_libre else 'Precio final unitario'}:</b> ${precio_unitario_con_descuento:,.2f}</span><br>
                         <span style="font-size:1.2em;">💰 <b>Total de esta venta:</b> ${total:,.2f}</span>
                     </div>
                     """, unsafe_allow_html=True
                 )
         
-                # --- Botón bien arriba ---
+                # --- Botón para registrar ---
                 btn_cols = st.columns([3, 1, 3])
                 with btn_cols[1]:
                     if st.button("🟢 Registrar Venta", key="btn_guardar_venta"):
                         try:
-                            if not producto['id'] or cantidad <= 0:
+                            if not producto['id'] or (not es_ingreso_libre and cantidad_val <= 0) or (es_ingreso_libre and importe_libre <= 0):
                                 st.error("❌ Completá todos los datos de la venta.")
                             else:
                                 producto_id = int(producto['id'])
@@ -935,11 +955,11 @@ elif seccion == "💵 Movimientos":
                                 cursor.execute("""
                                     INSERT INTO ventas (producto_id, cantidad, tipo_pago, fecha, precio_unitario, descripcion)
                                     VALUES (%s, %s, %s, %s, %s, %s)
-                                """, (producto_id, cantidad, tipo_pago, fecha_str, precio_unitario_con_descuento, descripcion_libre))
+                                """, (producto_id, cantidad_val, tipo_pago, fecha_str, precio_unitario_con_descuento, descripcion_libre))
                                 conn.commit()
                                 st.session_state["tipo_pago"] = tipo_pago
-                                st.session_state['ultima_venta'] = f"{cantidad} × {producto['nombre']} ({categoria} / {subcategoria}) – ${total:,.2f} el {fecha_str}"
-                                st.success(f"✅ Venta registrada: {cantidad} × {producto['nombre']} – ${total:,.2f}")
+                                st.session_state['ultima_venta'] = f"{cantidad_val} × {producto['nombre']} ({categoria} / {subcategoria}) – ${total:,.2f} el {fecha_str}"
+                                st.success(f"✅ Venta registrada: {cantidad_val} × {producto['nombre']} – ${total:,.2f}")
                                 st.rerun()
                         except Exception as e:
                             st.error(f"❌ Ocurrió un error al registrar la venta: {e}")
