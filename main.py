@@ -1383,6 +1383,4 @@ elif seccion == "🧪 Simulador de productos":
     
     if st.button("Limpiar simulación"):
         st.session_state["simulador_ingredientes"] = []
-        # Asegura que la variable exista tras el rerun
-        st.session_state["sim_cant_usada"] = 1.0
         st.experimental_rerun()
