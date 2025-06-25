@@ -1355,7 +1355,7 @@ elif seccion == "🧪 Simulador de productos":
         ingr_a_borrar = st.selectbox("Eliminar ingrediente de la simulación", sim_df["nombre"].tolist(), key="simulador_borrar")
         if st.button("Eliminar ingrediente seleccionado"):
             st.session_state["simulador_ingredientes"] = [ing for ing in st.session_state["simulador_ingredientes"] if ing["nombre"] != ingr_a_borrar]
-            st.experimental_rerun()
+            st.rerun()
     else:
         st.info("Sumá ingredientes para simular el costo y precio.")
     
@@ -1383,4 +1383,4 @@ elif seccion == "🧪 Simulador de productos":
     
     if st.button("Limpiar simulación"):
         st.session_state["simulador_ingredientes"] = []
-        st.experimental_rerun()
+        st.rerun()
