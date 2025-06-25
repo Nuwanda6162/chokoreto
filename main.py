@@ -1169,147 +1169,72 @@ elif seccion == "📉 Historial":
         else:
             import matplotlib.pyplot as plt
 
-            agrupamiento = st.radio("Agrupar datos por:", ["Día", "Mes"], horizontal=True)
+        modo_agrupacion = st.radio("Agrupar datos por:", ["Día", "Mes"], horizontal=True)
 
-            if agrupamiento == "Mes":
-                ventas_df = pd.read_sql_query("""
-                    SELECT SUBSTR(fecha, 1, 7) AS periodo, SUM(cantidad * precio_unitario) AS ventas
-                    FROM ventas
-                    WHERE fecha BETWEEN %s AND %s
-                    GROUP BY periodo
-                    ORDER BY periodo
-                """, conn, params=(str(fecha_desde), str(fecha_hasta)))
-                gastos_df = pd.read_sql_query("""
-                    SELECT SUBSTR(fecha, 1, 7) AS periodo, SUM(monto) AS gastos
-                    FROM gastos
-                    WHERE fecha BETWEEN %s AND %s
-                    GROUP BY periodo
-                    ORDER BY periodo
-                """, conn, params=(str(fecha_desde), str(fecha_hasta)))
-            else:
-                ventas_df = pd.read_sql_query("""
-                    SELECT fecha AS periodo, SUM(cantidad * precio_unitario) AS ventas
-                    FROM ventas
-                    WHERE fecha BETWEEN %s AND %s
-                    GROUP BY periodo
-                    ORDER BY periodo
-                """, conn, params=(str(fecha_desde), str(fecha_hasta)))
-                gastos_df = pd.read_sql_query("""
-                    SELECT fecha AS periodo, SUM(monto) AS gastos
-                    FROM gastos
-                    WHERE fecha BETWEEN %s AND %s
-                    GROUP BY periodo
-                    ORDER BY periodo
-                """, conn, params=(str(fecha_desde), str(fecha_hasta)))
-
-            df = pd.merge(ventas_df, gastos_df, on="periodo", how="outer").fillna(0)
-            df["ganancia"] = df["ventas"] - df["gastos"]
-
-            # Sumar totales según el dataframe ya agrupado y filtrado
-            total_ventas = df["ventas"].sum()
-            total_gastos = df["gastos"].sum()
-            total_ganancia = df["ganancia"].sum()
-
-            st.markdown(f"""
-            <div style="display: flex; gap: 2rem; margin-bottom: 1rem;">
-              <div style="background:#e6ffed; padding: 1em 2em; border-radius:10px; border:1px solid #b2f2bb;">
-                <b>💸 Total Ingresos</b><br>
-                <span style="font-size:1.5em;">${total_ventas:,.2f}</span>
-              </div>
-              <div style="background:#fff7e6; padding: 1em 2em; border-radius:10px; border:1px solid #ffe082;">
-                <b>📤 Total Gastos</b><br>
-                <span style="font-size:1.5em;">${total_gastos:,.2f}</span>
-              </div>
-              <div style="background:#e6f7ff; padding: 1em 2em; border-radius:10px; border:1px solid #91d5ff;">
-                <b>🧮 Balance</b><br>
-                <span style="font-size:1.5em; color:{"green" if total_ganancia >= 0 else "red"};">${total_ganancia:,.2f}</span>
-              </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-
-            st.dataframe(df)
-
-            fig, ax = plt.subplots()
-            ax.bar(df["periodo"], df["ventas"], label="Ventas", alpha=0.7)
-            ax.bar(df["periodo"], df["gastos"], label="Gastos", alpha=0.7, bottom=df["ventas"])
-            ax.plot(df["periodo"], df["ganancia"], label="Ganancia Neta", color="black", linewidth=2)
-            plt.xticks(rotation=45)
-            plt.title(f"Ventas, Gastos y Ganancia Neta por {agrupamiento.lower()}")
-            plt.xlabel(agrupamiento)
-            plt.ylabel("Monto")
-            plt.legend()
-            st.pyplot(fig)
-
-        # Ventas totales por producto en el rango
-        ventas_productos = pd.read_sql_query("""
-            SELECT p.nombre AS producto, SUM(v.cantidad) AS unidades, SUM(v.cantidad * v.precio_unitario) AS total_ventas
-            FROM ventas v
-            JOIN productos p ON v.producto_id = p.id
-            WHERE v.fecha BETWEEN %s AND %s
-            GROUP BY p.nombre
-            ORDER BY total_ventas DESC
-        """, conn, params=(str(fecha_desde), str(fecha_hasta)))
-        ventas_productos = ventas_productos[ventas_productos["producto"] != "Ingreso Libre"]
-
-        if not ventas_productos.empty and ventas_productos["total_ventas"].sum() > 0:
-            st.subheader("🍫 Ventas por producto")
-            st.dataframe(ventas_productos)
-
-            # Barras horizontales
-            import matplotlib.pyplot as plt
-
-            fig, ax = plt.subplots()
-            ax.barh(ventas_productos["producto"], ventas_productos["total_ventas"])
-            ax.set_xlabel("Total Ventas ($)")
-            ax.set_title("Ventas por producto")
-            st.pyplot(fig)
-
-            # Gráfico de torta opcional
-            if len(ventas_productos) <= 8:
-                fig2, ax2 = plt.subplots()
-                ax2.pie(
-                    ventas_productos["total_ventas"],
-                    labels=ventas_productos["producto"],
-                    autopct='%1.1f%%',
-                    startangle=90
-                )
-                ax2.axis('equal')
-                st.pyplot(fig2)
+        if modo_agrupacion == "Día":
+            ventas_df["periodo"] = pd.to_datetime(ventas_df["fecha"]).dt.strftime("%d/%m/%Y")
+            gastos_df["periodo"] = pd.to_datetime(gastos_df["fecha"]).dt.strftime("%d/%m/%Y")
         else:
-            st.info("No hay ventas en este rango para mostrar ventas por producto.")
-
-
-        # Ganancia por producto en el rango
-        ganancia_prod = pd.read_sql_query("""
-            SELECT 
-                p.nombre AS producto,
-                SUM(v.cantidad) AS unidades,
-                SUM(v.cantidad * v.precio_unitario) AS total_ventas,
-                SUM(v.cantidad * p.precio_costo) AS total_costos,
-                SUM(v.cantidad * (v.precio_unitario - p.precio_costo)) AS ganancia
-            FROM ventas v
-            JOIN productos p ON v.producto_id = p.id
-            WHERE v.fecha BETWEEN %s AND %s
-            GROUP BY p.nombre
-            ORDER BY ganancia DESC
-        """, conn, params=(str(fecha_desde), str(fecha_hasta)))
-        ganancia_prod = ganancia_prod[ganancia_prod["producto"] != "Ingreso Libre"]
+            ventas_df["periodo"] = pd.to_datetime(ventas_df["fecha"]).dt.strftime("%m/%Y")
+            gastos_df["periodo"] = pd.to_datetime(gastos_df["fecha"]).dt.strftime("%m/%Y")
         
-        if not ganancia_prod.empty and ganancia_prod["ganancia"].sum() > 0:
-            st.subheader("💰 Ganancia por producto")
-            st.dataframe(ganancia_prod)
-
-            # Barras horizontales
-            fig, ax = plt.subplots()
-            ax.barh(ganancia_prod["producto"], ganancia_prod["ganancia"])
-            ax.set_xlabel("Ganancia ($)")
-            ax.set_title("Ganancia por producto")
-            st.pyplot(fig)
+        # --------- Agrupación por periodo ---------
+        ventas_agrup = ventas_df.groupby("periodo").agg({"total":"sum"}).rename(columns={"total": "ventas"})
+        gastos_agrup = gastos_df.groupby("periodo").agg({"monto":"sum"}).rename(columns={"monto": "gastos"})
+        
+        # --------- Unificá los períodos para gráficos ---------
+        periodos = pd.DataFrame(index=ventas_agrup.index.union(gastos_agrup.index).sort_values())
+        periodos["ventas"] = ventas_agrup["ventas"]
+        periodos["gastos"] = gastos_agrup["gastos"]
+        periodos = periodos.fillna(0)
+        periodos["balance"] = periodos["ventas"] - periodos["gastos"]
+        
+        # --------- Cards de resumen ---------
+        total_ventas = ventas_df["total"].sum() if not ventas_df.empty else 0
+        total_gastos = gastos_df["monto"].sum() if not gastos_df.empty else 0
+        total_ganancia = total_ventas - total_gastos
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.markdown(f"<div style='background:#e6ffed; padding:1.5em; border-radius:12px; text-align:center; border:1px solid #b2f2bb;'><b>💸 Total Ingresos</b><br><span style='font-size:2em;'>${total_ventas:,.2f}</span></div>", unsafe_allow_html=True)
+        with col2:
+            st.markdown(f"<div style='background:#fff7e6; padding:1.5em; border-radius:12px; text-align:center; border:1px solid #ffe082;'><b>📤 Total Gastos</b><br><span style='font-size:2em;'>${total_gastos:,.2f}</span></div>", unsafe_allow_html=True)
+        with col3:
+            st.markdown(f"<div style='background:#e6f7ff; padding:1.5em; border-radius:12px; text-align:center; border:1px solid #91d5ff;'><b>🧮 Balance</b><br><span style='font-size:2em; color:{'green' if total_ganancia>=0 else 'red'};'>${total_ganancia:,.2f}</span></div>", unsafe_allow_html=True)
+        
+        st.divider()
+        
+        # --------- Gráfico de barras de ventas y gastos ---------
+        st.subheader(f"Evolución {'diaria' if modo_agrupacion == 'Día' else 'mensual'} de Ventas y Gastos")
+        st.bar_chart(periodos[["ventas", "gastos"]])
+        
+        # --------- Gráfico de balance ---------
+        st.subheader(f"Balance {'diario' if modo_agrupacion == 'Día' else 'mensual'}")
+        st.line_chart(periodos["balance"])
+        
+        # --------- Top productos vendidos ---------
+        st.subheader("Top productos más vendidos")
+        if not ventas_df.empty:
+            top_prod = ventas_df.groupby("producto").agg({"cantidad":"sum", "total":"sum"}).sort_values("total", ascending=False).head(10)
+            st.dataframe(top_prod, height=320)
         else:
-            st.info("No hay ventas en este rango para mostrar ganancia por producto.")
-
-
+            st.info("No hay ventas en el periodo.")
+        
+        # --------- Gastos por categoría ---------
+        st.subheader("Gastos por categoría")
+        if not gastos_df.empty:
+            gastos_cat = gastos_df.groupby("categoria")["monto"].sum().sort_values(ascending=False)
+            st.bar_chart(gastos_cat)
+        else:
+            st.info("No hay gastos en el periodo.")
+        
+        # --------- Tablas completas en expanders ---------
+        with st.expander("Ver tabla completa de ventas"):
+            st.dataframe(ventas_df)
+        
+        with st.expander("Ver tabla completa de gastos"):
+            st.dataframe(gastos_df)
+        
 
 
 
