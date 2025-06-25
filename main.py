@@ -995,7 +995,7 @@ elif seccion == "💵 Movimientos":
 
 
 # =========================
-# Registro de Ventas y Gastos
+# Historial de Ventas y Gastos
 # =========================
 
 elif seccion == "📉 Historial":
@@ -1020,7 +1020,8 @@ elif seccion == "📉 Historial":
         else:
             ventas_df = pd.read_sql_query("""
                 SELECT v.fecha, p.nombre AS producto, v.cantidad, v.tipo_pago, v.precio_unitario,
-                       (v.cantidad * v.precio_unitario) AS total
+                       (v.cantidad * v.precio_unitario) AS total,
+                       v.descripcion
                 FROM ventas v
                 LEFT JOIN productos p ON v.producto_id = p.id
                 WHERE v.fecha BETWEEN %s AND %s
