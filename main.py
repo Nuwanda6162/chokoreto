@@ -1007,7 +1007,7 @@ elif seccion == "📉 Historial":
     ])
     with tab1:
         # Visor de Ventas
-        st.title("📈 Visor de Ventas")
+        st.title("📈 Visor de Ventas (editable)")
         
         col1, col2 = st.columns(2)
         with col1:
@@ -1031,134 +1031,154 @@ elif seccion == "📉 Historial":
             if ventas_df.empty:
                 st.info("No se encontraron ventas en el rango seleccionado.")
             else:
-                # ---------------------------
-                # Campo de búsqueda (producto o descripción)
-                busqueda_ventas = st.text_input("🔍 Buscar en ventas (producto o descripción):", value="", key="busqueda_ventas")
+                # --- Setup para edición ---
+                # Listas/dict de productos para dropdown y lookup
+                productos_df = pd.read_sql_query("SELECT id, nombre, precio_normalizado FROM productos", conn)
+                productos_lista = productos_df["nombre"].tolist()
+                productos_dict = dict(zip(productos_df["nombre"], productos_df["id"]))
+                productos_precio = dict(zip(productos_df["nombre"], productos_df["precio_normalizado"]))
         
-                if busqueda_ventas:
-                    ventas_filtradas = ventas_df[
-                        ventas_df["producto"].str.lower().str.contains(busqueda_ventas.lower(), na=False) |
-                        ventas_df["descripcion"].str.lower().str.contains(busqueda_ventas.lower(), na=False)
-                    ]
-                else:
-                    ventas_filtradas = ventas_df
-                # ---------------------------
+                # Editable DataFrame
+                edit_cols = ["fecha", "producto", "cantidad", "tipo_pago", "descripcion"]
+                editable_df = ventas_df[["id"] + edit_cols].copy()
         
-                if ventas_filtradas.empty:
-                    st.info("No se encontraron ventas que coincidan con la búsqueda.")
-                else:
-                    st.dataframe(ventas_filtradas)
+                column_config = {
+                    "id": st.column_config.Column("ID", disabled=True),
+                    "fecha": st.column_config.DateColumn("Fecha"),
+                    "producto": st.column_config.SelectboxColumn("Producto", options=productos_lista),
+                    "cantidad": st.column_config.NumberColumn("Cantidad", min_value=0, step=1),
+                    "tipo_pago": st.column_config.SelectboxColumn("Tipo de pago", options=["Efectivo", "Otros"]),
+                    "descripcion": st.column_config.TextColumn("Descripción"),
+                }
         
-                    # Totales por día (usando solo lo filtrado)
-                    total_dia = ventas_filtradas.groupby("fecha")["total"].sum().reset_index()
-                    total_dia.columns = ["Fecha", "Total del día"]
-                    st.subheader("💰 Total de ventas por día")
-                    st.table(total_dia)
+                edited = st.data_editor(
+                    editable_df,
+                    column_config=column_config,
+                    num_rows="dynamic",
+                    key="ventas_editor"
+                )
         
-                    # Total general filtrado
-                    total_general = ventas_filtradas["total"].sum()
-                    st.success(f"🧮 Total del período: **${round(total_general, 2)}**")
-        
-                    # --- OPCIÓN PARA ELIMINAR UNA VENTA SOLO SOBRE FILTRADO ---
-                    st.subheader("🗑️ Eliminar una venta puntual")
-                    # Armamos el dict sobre ventas_filtradas
-                    ventas_filtradas["info"] = (
-                        "ID " + ventas_filtradas["id"].astype(str) +
-                        " – " + ventas_filtradas["producto"] +
-                        " – " + ventas_filtradas["fecha"].astype(str) +
-                        " – $" + ventas_filtradas["total"].round(2).astype(str)
-                    )
-                    venta_dict = dict(zip(ventas_filtradas["info"], ventas_filtradas["id"]))
-        
-                    if venta_dict:
-                        venta_sel = st.selectbox("Seleccioná la venta a eliminar", list(venta_dict.keys()), key="venta_del_sel")
-                        venta_id = venta_dict[venta_sel]
-        
-                        if st.button("❌ Eliminar esta venta", key="btn_eliminar_venta"):
-                            try:
-                                cursor.execute("DELETE FROM ventas WHERE id = %s", (venta_id,))
-                                conn.commit()
-                                st.success(f"Venta ID {venta_id} eliminada correctamente.")
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"❌ Ocurrió un error al eliminar la venta: {e}")
+                if st.button("💾 Guardar cambios en ventas"):
+                    cambios = 0
+                    for idx, row in edited.iterrows():
+                        orig_row = editable_df.loc[idx]
+                        # Detectar cambios
+                        if not (row == orig_row).all():
+                            # Recalcula precio_unitario según producto elegido
+                            prod_id = productos_dict[row["producto"]]
+                            precio_unitario = productos_precio[row["producto"]]
+                            total = row["cantidad"] * precio_unitario
+                            # Actualizá la fila (precio_unitario se recalcula, total se recalcula)
+                            cursor.execute("""
+                                UPDATE ventas
+                                SET fecha = %s, producto_id = %s, cantidad = %s, tipo_pago = %s, descripcion = %s, precio_unitario = %s
+                                WHERE id = %s
+                            """, (row["fecha"], prod_id, row["cantidad"], row["tipo_pago"], row["descripcion"], precio_unitario, row["id"]))
+                            cambios += 1
+                    conn.commit()
+                    if cambios:
+                        st.success(f"¡Se guardaron {cambios} cambios en ventas!")
+                        st.rerun()
                     else:
-                        st.info("No hay ventas para eliminar en este resultado.")
+                        st.info("No hubo cambios para guardar.")
+        
+                # --- Muestra la tabla con totales ---
+                ventas_df = pd.read_sql_query("""
+                    SELECT v.fecha, p.nombre AS producto, v.cantidad, v.tipo_pago, v.precio_unitario,
+                           (v.cantidad * v.precio_unitario) AS total,
+                           v.descripcion
+                    FROM ventas v
+                    LEFT JOIN productos p ON v.producto_id = p.id
+                    WHERE v.fecha BETWEEN %s AND %s
+                    ORDER BY v.fecha DESC
+                """, conn, params=(str(fecha_desde), str(fecha_hasta)))
+                st.dataframe(ventas_df)
+        
+                # Totales por día (usando solo lo filtrado)
+                total_dia = ventas_df.groupby("fecha")["total"].sum().reset_index()
+                total_dia.columns = ["Fecha", "Total del día"]
+                st.subheader("💰 Total de ventas por día")
+                st.table(total_dia)
+        
+                # Total general filtrado
+                total_general = ventas_df["total"].sum()
+                st.success(f"🧮 Total del período: **${round(total_general, 2)}**")
 
     with tab2:
         # Gastos
-        st.title("📊 Visor de Gastos")
-
+        st.title("📊 Visor de Gastos (editable)")
+        
         col1, col2 = st.columns(2)
         with col1:
             fecha_desde = st.date_input("Desde", value=date.today(), key="fecha_inicio_gasto")
         with col2:
             fecha_hasta = st.date_input("Hasta", value=date.today(), key="fecha_fin_gasto")
-
+        
         if fecha_desde > fecha_hasta:
             st.warning("La fecha 'Desde' no puede ser posterior a 'Hasta'")
         else:
             gastos_df = pd.read_sql_query("""
-                SELECT * FROM gastos
+                SELECT id, fecha, descripcion, monto, categoria
+                FROM gastos
                 WHERE fecha BETWEEN %s AND %s
                 ORDER BY fecha DESC
             """, conn, params=(str(fecha_desde), str(fecha_hasta)))
-
+        
             if gastos_df.empty:
                 st.info("No se encontraron gastos en el rango seleccionado.")
             else:
+                edit_cols = ["fecha", "descripcion", "monto", "categoria"]
+                editable_df = gastos_df[["id"] + edit_cols].copy()
+        
+                column_config = {
+                    "id": st.column_config.Column("ID", disabled=True),
+                    "fecha": st.column_config.DateColumn("Fecha"),
+                    "descripcion": st.column_config.TextColumn("Descripción"),
+                    "monto": st.column_config.NumberColumn("Monto", min_value=0.0, step=10.0),
+                    "categoria": st.column_config.SelectboxColumn("Categoría", options=["Insumos", "Alquiler", "Electricidad", "Internet", "Otros"]),
+                }
+        
+                edited = st.data_editor(
+                    editable_df,
+                    column_config=column_config,
+                    num_rows="dynamic",
+                    key="gastos_editor"
+                )
+        
+                if st.button("💾 Guardar cambios en gastos"):
+                    cambios = 0
+                    for idx, row in edited.iterrows():
+                        orig_row = editable_df.loc[idx]
+                        if not (row == orig_row).all():
+                            cursor.execute("""
+                                UPDATE gastos
+                                SET fecha = %s, descripcion = %s, monto = %s, categoria = %s
+                                WHERE id = %s
+                            """, (row["fecha"], row["descripcion"], row["monto"], row["categoria"], row["id"]))
+                            cambios += 1
+                    conn.commit()
+                    if cambios:
+                        st.success(f"¡Se guardaron {cambios} cambios en gastos!")
+                        st.rerun()
+                    else:
+                        st.info("No hubo cambios para guardar.")
+        
+                # --- Muestra la tabla con totales ---
+                gastos_df = pd.read_sql_query("""
+                    SELECT fecha, descripcion, monto, categoria
+                    FROM gastos
+                    WHERE fecha BETWEEN %s AND %s
+                    ORDER BY fecha DESC
+                """, conn, params=(str(fecha_desde), str(fecha_hasta)))
                 st.dataframe(gastos_df)
-
+        
                 total_dia = gastos_df.groupby("fecha")["monto"].sum().reset_index()
                 total_dia.columns = ["Fecha", "Total del día"]
                 st.subheader("💰 Total de gastos por día")
                 st.table(total_dia)
-
+        
                 total_general = gastos_df["monto"].sum()
                 st.success(f"🧾 Total de gastos del período: **${round(total_general, 2)}**")
-
-                if st.button("📤 Exportar a Excel", key="btn_exportar_gastos"):
-                    try:
-                        export_path = "/tmp/gastos_filtrados.xlsx"
-                        gastos_df.to_excel(export_path, index=False)
-                        with open(export_path, "rb") as f:
-                            st.download_button("Descargar Excel", data=f, file_name="gastos_filtrados.xlsx")
-                    except Exception as e:
-                        st.error(f"❌ Ocurrió un error al exportar el archivo: {e}")
-        
-        # --- OPCIÓN PARA ELIMINAR UN GASTO ---
-        st.subheader("🗑️ Eliminar un gasto puntual")
-        
-        # Cargá de nuevo los gastos en el rango, con IDs
-        gastos_id_df = pd.read_sql_query("""
-            SELECT id, fecha, descripcion, monto, categoria
-            FROM gastos
-            WHERE fecha BETWEEN %s AND %s
-            ORDER BY fecha DESC
-        """, conn, params=(str(fecha_desde), str(fecha_hasta)))
-        
-        if not gastos_id_df.empty:
-            gastos_id_df["info"] = (
-                "ID " + gastos_id_df["id"].astype(str) +
-                " – " + gastos_id_df["descripcion"] +
-                " – " + gastos_id_df["fecha"] +
-                " – $" + gastos_id_df["monto"].round(2).astype(str)
-            )
-            gasto_dict = dict(zip(gastos_id_df["info"], gastos_id_df["id"]))
-        
-            gasto_sel = st.selectbox("Seleccioná el gasto a eliminar", list(gasto_dict.keys()), key="gasto_del_sel")
-            gasto_id = gasto_dict[gasto_sel]
-        
-            if st.button("❌ Eliminar este gasto", key="btn_eliminar_gasto"):
-                try:
-                    cursor.execute("DELETE FROM gastos WHERE id = %s", (gasto_id,))
-                    conn.commit()
-                    st.success(f"Gasto ID {gasto_id} eliminado correctamente.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"❌ Ocurrió un error al eliminar el gasto: {e}")
-        else:
-            st.info("No hay gastos para eliminar en este rango.")
 
     
     
