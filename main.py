@@ -999,27 +999,95 @@ elif seccion == "💵 Movimientos":
 # =========================
 
 elif seccion == "📉 Historial":
-    st.title("Historial de ventas y gastos")
-    tab1, tab2, tab3 = st.tabs([
-        "Ventas",
-        "Gastos",
-        "Dashboard"
-    ])
-    with tab1:
-        # Visor de Ventas
-        st.title("📈 Visor de Ventas (editable)")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            fecha_desde = st.date_input("Desde", value=date.today(), key="fecha_inicio")
-        with col2:
-            fecha_hasta = st.date_input("Hasta", value=date.today(), key="fecha_fin")
-        
-        if fecha_desde > fecha_hasta:
-            st.warning("La fecha 'Desde' no puede ser posterior a 'Hasta'")
+    st.title("📈 Visor de Ventas (editable)")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        fecha_desde = st.date_input("Desde", value=date.today(), key="fecha_inicio")
+    with col2:
+        fecha_hasta = st.date_input("Hasta", value=date.today(), key="fecha_fin")
+    
+    if fecha_desde > fecha_hasta:
+        st.warning("La fecha 'Desde' no puede ser posterior a 'Hasta'")
+    else:
+        ventas_df = pd.read_sql_query("""
+            SELECT v.id, v.fecha, p.nombre AS producto, v.cantidad, v.tipo_pago, v.precio_unitario,
+                   (v.cantidad * v.precio_unitario) AS total,
+                   v.descripcion
+            FROM ventas v
+            LEFT JOIN productos p ON v.producto_id = p.id
+            WHERE v.fecha BETWEEN %s AND %s
+            ORDER BY v.fecha DESC
+        """, conn, params=(str(fecha_desde), str(fecha_hasta)))
+    
+        if ventas_df.empty:
+            st.info("No se encontraron ventas en el rango seleccionado.")
         else:
+            # --- Setup para edición ---
+            productos_df = pd.read_sql_query("SELECT id, nombre, precio_normalizado FROM productos", conn)
+            productos_lista = productos_df["nombre"].tolist()
+            productos_dict = dict(zip(productos_df["nombre"], productos_df["id"]))
+            productos_precio = dict(zip(productos_df["nombre"], productos_df["precio_normalizado"]))
+    
+            # Editable DataFrame
+            edit_cols = ["fecha", "producto", "cantidad", "tipo_pago", "descripcion"]
+            editable_df = ventas_df[["id"] + edit_cols].copy()
+    
+            # --- Conversión y control de tipos ---
+            editable_df["fecha"] = pd.to_datetime(editable_df["fecha"], errors="coerce").dt.date
+            # Asegura productos válidos
+            if not editable_df["producto"].isin(productos_lista).all():
+                editable_df.loc[~editable_df["producto"].isin(productos_lista), "producto"] = productos_lista[0]
+            # Tipo de pago seguro
+            if not editable_df["tipo_pago"].isin(["Efectivo", "Otros"]).all():
+                editable_df.loc[~editable_df["tipo_pago"].isin(["Efectivo", "Otros"]), "tipo_pago"] = "Efectivo"
+            # Completa vacíos
+            editable_df = editable_df.fillna({"descripcion": ""})
+            # Cantidad como float (Streamlit no soporta int a veces)
+            editable_df["cantidad"] = editable_df["cantidad"].astype(float)
+    
+            column_config = {
+                "id": st.column_config.Column("ID", disabled=True),
+                "fecha": st.column_config.DateColumn("Fecha"),
+                "producto": st.column_config.SelectboxColumn("Producto", options=productos_lista),
+                "cantidad": st.column_config.NumberColumn("Cantidad", min_value=0, step=1),
+                "tipo_pago": st.column_config.SelectboxColumn("Tipo de pago", options=["Efectivo", "Otros"]),
+                "descripcion": st.column_config.TextColumn("Descripción"),
+            }
+    
+            edited = st.data_editor(
+                editable_df,
+                column_config=column_config,
+                num_rows="dynamic",
+                key="ventas_editor"
+            )
+    
+            if st.button("💾 Guardar cambios en ventas"):
+                cambios = 0
+                for idx, row in edited.iterrows():
+                    orig_row = editable_df.loc[idx]
+                    # Detectar cambios
+                    if not (row == orig_row).all():
+                        # Recalcula precio_unitario según producto elegido
+                        prod_id = productos_dict[row["producto"]]
+                        precio_unitario = productos_precio[row["producto"]]
+                        # Actualizá la fila
+                        cursor.execute("""
+                            UPDATE ventas
+                            SET fecha = %s, producto_id = %s, cantidad = %s, tipo_pago = %s, descripcion = %s, precio_unitario = %s
+                            WHERE id = %s
+                        """, (row["fecha"], prod_id, row["cantidad"], row["tipo_pago"], row["descripcion"], precio_unitario, row["id"]))
+                        cambios += 1
+                conn.commit()
+                if cambios:
+                    st.success(f"¡Se guardaron {cambios} cambios en ventas!")
+                    st.rerun()
+                else:
+                    st.info("No hubo cambios para guardar.")
+    
+            # --- Muestra la tabla con totales ---
             ventas_df = pd.read_sql_query("""
-                SELECT v.id, v.fecha, p.nombre AS producto, v.cantidad, v.tipo_pago, v.precio_unitario,
+                SELECT v.fecha, p.nombre AS producto, v.cantidad, v.tipo_pago, v.precio_unitario,
                        (v.cantidad * v.precio_unitario) AS total,
                        v.descripcion
                 FROM ventas v
@@ -1027,82 +1095,15 @@ elif seccion == "📉 Historial":
                 WHERE v.fecha BETWEEN %s AND %s
                 ORDER BY v.fecha DESC
             """, conn, params=(str(fecha_desde), str(fecha_hasta)))
-        
-            if ventas_df.empty:
-                st.info("No se encontraron ventas en el rango seleccionado.")
-            else:
-                # --- Setup para edición ---
-                # Listas/dict de productos para dropdown y lookup
-                productos_df = pd.read_sql_query("SELECT id, nombre, precio_normalizado FROM productos", conn)
-                productos_lista = productos_df["nombre"].tolist()
-                productos_dict = dict(zip(productos_df["nombre"], productos_df["id"]))
-                productos_precio = dict(zip(productos_df["nombre"], productos_df["precio_normalizado"]))
-        
-                # Editable DataFrame
-                edit_cols = ["fecha", "producto", "cantidad", "tipo_pago", "descripcion"]
-                editable_df = ventas_df[["id"] + edit_cols].copy()
-        
-                column_config = {
-                    "id": st.column_config.Column("ID", disabled=True),
-                    "fecha": st.column_config.DateColumn("Fecha"),
-                    "producto": st.column_config.SelectboxColumn("Producto", options=productos_lista),
-                    "cantidad": st.column_config.NumberColumn("Cantidad", min_value=0, step=1),
-                    "tipo_pago": st.column_config.SelectboxColumn("Tipo de pago", options=["Efectivo", "Otros"]),
-                    "descripcion": st.column_config.TextColumn("Descripción"),
-                }
-        
-                edited = st.data_editor(
-                    editable_df,
-                    column_config=column_config,
-                    num_rows="dynamic",
-                    key="ventas_editor"
-                )
-        
-                if st.button("💾 Guardar cambios en ventas"):
-                    cambios = 0
-                    for idx, row in edited.iterrows():
-                        orig_row = editable_df.loc[idx]
-                        # Detectar cambios
-                        if not (row == orig_row).all():
-                            # Recalcula precio_unitario según producto elegido
-                            prod_id = productos_dict[row["producto"]]
-                            precio_unitario = productos_precio[row["producto"]]
-                            total = row["cantidad"] * precio_unitario
-                            # Actualizá la fila (precio_unitario se recalcula, total se recalcula)
-                            cursor.execute("""
-                                UPDATE ventas
-                                SET fecha = %s, producto_id = %s, cantidad = %s, tipo_pago = %s, descripcion = %s, precio_unitario = %s
-                                WHERE id = %s
-                            """, (row["fecha"], prod_id, row["cantidad"], row["tipo_pago"], row["descripcion"], precio_unitario, row["id"]))
-                            cambios += 1
-                    conn.commit()
-                    if cambios:
-                        st.success(f"¡Se guardaron {cambios} cambios en ventas!")
-                        st.rerun()
-                    else:
-                        st.info("No hubo cambios para guardar.")
-        
-                # --- Muestra la tabla con totales ---
-                ventas_df = pd.read_sql_query("""
-                    SELECT v.fecha, p.nombre AS producto, v.cantidad, v.tipo_pago, v.precio_unitario,
-                           (v.cantidad * v.precio_unitario) AS total,
-                           v.descripcion
-                    FROM ventas v
-                    LEFT JOIN productos p ON v.producto_id = p.id
-                    WHERE v.fecha BETWEEN %s AND %s
-                    ORDER BY v.fecha DESC
-                """, conn, params=(str(fecha_desde), str(fecha_hasta)))
-                st.dataframe(ventas_df)
-        
-                # Totales por día (usando solo lo filtrado)
-                total_dia = ventas_df.groupby("fecha")["total"].sum().reset_index()
-                total_dia.columns = ["Fecha", "Total del día"]
-                st.subheader("💰 Total de ventas por día")
-                st.table(total_dia)
-        
-                # Total general filtrado
-                total_general = ventas_df["total"].sum()
-                st.success(f"🧮 Total del período: **${round(total_general, 2)}**")
+            st.dataframe(ventas_df)
+    
+            total_dia = ventas_df.groupby("fecha")["total"].sum().reset_index()
+            total_dia.columns = ["Fecha", "Total del día"]
+            st.subheader("💰 Total de ventas por día")
+            st.table(total_dia)
+    
+            total_general = ventas_df["total"].sum()
+            st.success(f"🧮 Total del período: **${round(total_general, 2)}**")
 
     with tab2:
         # Gastos
