@@ -342,31 +342,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
         # ⚙️ Categorías de Productos (ABM)
         st.title("⚙️ Categorías y Subcategorías de Productos")
         st.subheader("Editar categorías de productos (tipo Excel)")
-
-        if st.button("🔄 Recalcular precios de TODOS los productos", key="recalcular_todos_prod"):
-            try:
-                productos = pd.read_sql_query("SELECT id, margen, precio_costo FROM productos", conn)
-                cambios = 0
-                for _, prod in productos.iterrows():
-                    margen = float(prod["margen"])
-                    precio_costo = float(prod["precio_costo"])
-                    precio_final = round(precio_costo * margen, 2)
-                    precio_normalizado = float(redondeo_personalizado(precio_final))
-                    cursor.execute("""
-                        UPDATE productos
-                        SET precio_final = %s, precio_normalizado = %s
-                        WHERE id = %s
-                    """, (precio_final, precio_normalizado, int(prod["id"])))
-                    cambios += 1
-                conn.commit()
-                st.success(f"¡Precios recalculados en {cambios} productos!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"❌ Ocurrió un error al recalcular precios: {e}")
-
-
-
-        
+    
         cat_prod_df = pd.read_sql_query("SELECT * FROM categoria_productos", conn)
 
         if cat_prod_df.empty:
@@ -633,6 +609,28 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
         else:
             st.warning("No hay categorías de productos cargadas.")
 
+        if st.button("🔄 Recalcular precios de TODOS los productos", key="recalcular_todos_prod"):
+            try:
+                productos = pd.read_sql_query("SELECT id, margen, precio_costo FROM productos", conn)
+                cambios = 0
+                for _, prod in productos.iterrows():
+                    margen = float(prod["margen"])
+                    precio_costo = float(prod["precio_costo"])
+                    precio_final = round(precio_costo * margen, 2)
+                    precio_normalizado = float(redondeo_personalizado(precio_final))
+                    cursor.execute("""
+                        UPDATE productos
+                        SET precio_final = %s, precio_normalizado = %s
+                        WHERE id = %s
+                    """, (precio_final, precio_normalizado, int(prod["id"])))
+                    cambios += 1
+                conn.commit()
+                st.success(f"¡Precios recalculados en {cambios} productos!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ Ocurrió un error al recalcular precios: {e}")
+
+    
     with tab5:
         # Agregar Ingredientes
         st.title("🍫 Ingredientes por Producto")
