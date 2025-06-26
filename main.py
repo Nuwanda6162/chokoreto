@@ -483,38 +483,46 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
 
 
     with tab4:
-    # Productos (ABM)
-#    elif seccion == "🧪 Producto (ABM)":
+        # --- Productos (ABM) ---
         st.title("🧪 Productos – ABM")
+    
+        # Cargar categorías y subcategorías
         cat_df = pd.read_sql_query("SELECT * FROM categoria_productos", conn)
         if not cat_df.empty:
             cat_sel = st.selectbox("Categoría de Producto", cat_df["nombre"].tolist(), key="cat_prod_abm")
             sub_df = pd.read_sql_query("""
-                    SELECT sp.id, sp.nombre FROM subcategorias_productos sp
-                    JOIN categoria_productos cp ON sp.categoria_id = cp.id
-                    WHERE cp.nombre = %s
-                """, conn, params=(cat_sel,))
+                SELECT sp.id, sp.nombre FROM subcategorias_productos sp
+                JOIN categoria_productos cp ON sp.categoria_id = cp.id
+                WHERE cp.nombre = %s
+            """, conn, params=(cat_sel,))
             sub_dict = dict(zip(sub_df["nombre"], sub_df["id"]))
-
-
+    
             if sub_dict:
                 sub_sel = st.selectbox("Subcategoría", sorted(sub_dict.keys()), key="subcat_prod_abm")
                 sub_id = sub_dict[sub_sel]
-
-                # --- PRODUCTOS CON PRECIOS VISIBLES ---
+    
+                # --- PRODUCTOS CON PRECIOS VISIBLES Y EDITABLES ---
                 productos_df = pd.read_sql_query("""
                     SELECT id, nombre, margen, precio_costo, precio_final, precio_normalizado
                     FROM productos
                     WHERE subcategoria_id = %s
                 """, conn, params=(sub_id,))
-
+    
                 if productos_df.empty:
                     st.info("No hay productos en esta subcategoría.")
                 else:
                     st.subheader("Editar productos (tipo Excel)")
+    
                     editable_cols = ["id", "nombre", "margen", "precio_costo", "precio_final", "precio_normalizado"]
                     editable_prods = productos_df[editable_cols].copy()
-
+    
+                    # Casts seguros para todos los valores
+                    editable_prods["margen"] = editable_prods["margen"].astype(float)
+                    editable_prods["precio_costo"] = editable_prods["precio_costo"].astype(float)
+                    editable_prods["precio_final"] = editable_prods["precio_final"].astype(float)
+                    editable_prods["precio_normalizado"] = editable_prods["precio_normalizado"].astype(float)
+                    editable_prods["id"] = editable_prods["id"].astype(int)
+    
                     edited = st.data_editor(
                         editable_prods,
                         column_config={
@@ -528,25 +536,29 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                         num_rows="dynamic",
                         key="data_editor_prods"
                     )
-
+    
                     if st.button("💾 Guardar cambios en productos"):
                         cambios = 0
                         for idx, row in edited.iterrows():
                             orig_row = editable_prods.loc[idx]
-                            if row["nombre"] != orig_row["nombre"] or not math.isclose(row["margen"],
-                                                                                       orig_row["margen"]):
+                            if row["nombre"] != orig_row["nombre"] or not math.isclose(float(row["margen"]), float(orig_row["margen"])):
                                 try:
-                                    # Actualizá margen y recalculá precios
-                                    precio_costo = row["precio_costo"] if row["precio_costo"] else 0.0
-                                    precio_final = round(precio_costo * row["margen"], 2)
-                                    precio_normalizado = redondeo_personalizado(precio_final)
+                                    nombre = row["nombre"]
+                                    margen = float(row["margen"])
+                                    precio_costo = float(row["precio_costo"]) if row["precio_costo"] else 0.0
+                                    precio_final = round(precio_costo * margen, 2)
+                                    precio_normalizado = float(redondeo_personalizado(precio_final))
+                                    prod_id = int(row["id"])
                                     cursor.execute("""
                                         UPDATE productos
                                         SET nombre = %s, margen = %s, precio_final = %s, precio_normalizado = %s
                                         WHERE id = %s
-                                    """, (row["nombre"], float(row["margen"]), float(precio_final), float(precio_normalizado), int(row["id"])))
+                                    """, (nombre, margen, precio_final, precio_normalizado, prod_id))
                                     conn.commit()
                                     cambios += 1
+                                except psycopg2.IntegrityError:
+                                    conn.rollback()
+                                    st.error("❌ Ya existe un producto con ese nombre en esta subcategoría.")
                                 except Exception as e:
                                     st.error(f"❌ Error al actualizar el producto ID {row['id']}: {e}")
                         if cambios:
@@ -554,79 +566,29 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                             st.rerun()
                         else:
                             st.info("No hubo cambios para guardar.")
-
+    
                     st.caption("Editá nombre y margen. Los precios se actualizan solos al guardar.")
-                if not productos_df.empty:
-                    # --- Editar o eliminar producto existente ---
-                    st.subheader("Editar o eliminar producto")
-                    prod_dict = dict(zip(productos_df["nombre"], productos_df["id"]))
-                    prod_sel = st.selectbox("Seleccioná un producto", sorted(prod_dict.keys()), key="prod_edit_sel")
-                    prod_id = prod_dict[prod_sel]
-                    datos = pd.read_sql_query("SELECT * FROM productos WHERE id = %s", conn, params=(prod_id,)).iloc[0]
-
-                    nuevo_nombre = st.text_input("Nombre", value=datos["nombre"], key="edit_nombre_prod")
-                    nuevo_margen = st.number_input("Margen de ganancia", value=float(datos["margen"]), step=0.1,
-                                                   key="edit_margen_prod")
-
-                    precio_costo = datos["precio_costo"]
-                    if precio_costo is None:
-                        st.warning("Este producto aún no tiene ingredientes cargados. El precio de costo es 0.")
-                        precio_costo = 0.0
-
-                    precio_final = round(precio_costo * nuevo_margen, 2)
-
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if st.button("Actualizar Producto", key="btn_actualizar_prod"):
-                            try:
-                                precio_normalizado = round(precio_final, -2)
-                                cursor.execute("""
-                                        UPDATE productos SET nombre = %s, margen = %s, precio_final = %s, precio_normalizado = %s
-                                        WHERE id = %s
-                                    """, (nuevo_nombre.strip(), float(nuevo_margen), float(precio_final), float(precio_normalizado), int(prod_id)))
-                                conn.commit()
-                                st.success("Producto actualizado")
-                                st.rerun()
-                            except psycopg2.IntegrityError:
-                                st.error("❌ Ya existe un producto con ese nombre en esta subcategoría.")
-                            except Exception as e:
-                                st.error(f"❌ Ocurrió un error al actualizar: {e}")
-                    with col2:
-                        confirmar = st.checkbox("Confirmo que deseo eliminar este producto y sus datos relacionados",
-                                                key="chk_confirm_del_prod")
-                        st.warning("⚠️ Esta acción eliminará el producto y TODAS las ventas e ingredientes asociados.")
-                        if confirmar:
-                            if st.button("❌ Eliminar Producto", key="btn_eliminar_prod"):
-                                try:
-                                    cursor.execute("DELETE FROM ingredientes_producto WHERE producto_id = %s", (prod_id,))
-                                    cursor.execute("DELETE FROM ventas WHERE producto_id = %s", (prod_id,))
-                                    cursor.execute("DELETE FROM productos WHERE id = %s", (prod_id,))
-                                    conn.commit()
-                                    st.success("Producto y registros asociados eliminados correctamente.")
-                                    st.rerun()
-                                except Exception as e:
-                                    st.error(f"❌ Ocurrió un error al eliminar: {e}")
-                else:
-                    st.info("No hay productos cargados en esta subcategoría.")
-
-                # --- Agregar nuevo producto (se muestra siempre si hay subcategoría válida) ---
+    
+                # --- Agregar nuevo producto ---
                 st.subheader("Agregar nuevo producto")
                 nuevo_nombre = st.text_input("Nombre nuevo", key="nombre_nuevo_prod")
                 nuevo_margen = st.number_input("Margen de ganancia", min_value=0.0, step=0.1, key="margen_nuevo_prod")
-
+    
                 if st.button("Guardar nuevo producto", key="guardar_nuevo_prod") and nuevo_nombre:
                     try:
+                        # Cast seguro a float
+                        margen_val = float(nuevo_margen)
                         precio_costo = 0.0  # como aún no hay ingredientes cargados
-                        precio_final = round(precio_costo * nuevo_margen, 2)
-                        precio_normalizado = round(precio_final, -2)
-
+                        precio_final = round(precio_costo * margen_val, 2)
+                        precio_normalizado = float(redondeo_personalizado(precio_final))
                         cursor.execute("""
-                                INSERT INTO productos (nombre, margen, categoria_id, subcategoria_id, precio_costo, precio_final, precio_normalizado)
-                                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                            """, (
-                            nuevo_nombre.strip(), nuevo_margen,
-                            cat_df[cat_df["nombre"] == cat_sel]["id"].values[0],
-                            sub_dict[sub_sel],
+                            INSERT INTO productos (nombre, margen, categoria_id, subcategoria_id, precio_costo, precio_final, precio_normalizado)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            nuevo_nombre.strip(),
+                            margen_val,
+                            int(cat_df[cat_df["nombre"] == cat_sel]["id"].values[0]),
+                            int(sub_dict[sub_sel]),
                             precio_costo,
                             precio_final,
                             precio_normalizado
@@ -635,12 +597,15 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                         st.success("Producto guardado correctamente")
                         st.rerun()
                     except psycopg2.IntegrityError:
+                        conn.rollback()
                         st.error("❌ Ya existe un producto con ese nombre en esta subcategoría.")
                     except Exception as e:
                         st.error(f"❌ Ocurrió un error inesperado: {e}")
-
+    
             else:
                 st.warning("Esta categoría no tiene subcategorías.")
+        else:
+            st.warning("No hay categorías de productos cargadas.")
 
     with tab5:
         # Agregar Ingredientes
