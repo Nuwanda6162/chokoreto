@@ -537,7 +537,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                         key="data_editor_prods"
                     )
     
-                    if st.button("💾 Guardar cambios en productos"):
+                    if st.button("💾 Guardar cambios en productos")
                         cambios = 0
                         for idx, row in edited.iterrows():
                             orig_row = editable_prods.loc[idx]
@@ -581,6 +581,8 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                         precio_costo = 0.0  # como aún no hay ingredientes cargados
                         precio_final = round(precio_costo * margen_val, 2)
                         precio_normalizado = float(redondeo_personalizado(precio_final))
+                        print("INSERT:", nuevo_nombre.strip(), margen_val, int(cat_df[cat_df["nombre"] == cat_sel]["id"].values[0]), int(sub_dict[sub_sel]), precio_costo, precio_final, precio_normalizado)
+
                         cursor.execute("""
                             INSERT INTO productos (nombre, margen, categoria_id, subcategoria_id, precio_costo, precio_final, precio_normalizado)
                             VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -596,9 +598,9 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                         conn.commit()
                         st.success("Producto guardado correctamente")
                         st.rerun()
-                    except psycopg2.IntegrityError:
+                    except psycopg2.IntegrityError as e:
                         conn.rollback()
-                        st.error("❌ Ya existe un producto con ese nombre en esta subcategoría.")
+                        st.error(f"❌ Error de integridad: {e}")
                     except Exception as e:
                         st.error(f"❌ Ocurrió un error inesperado: {e}")
     
