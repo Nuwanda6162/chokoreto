@@ -343,6 +343,30 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
         st.title("⚙️ Categorías y Subcategorías de Productos")
         st.subheader("Editar categorías de productos (tipo Excel)")
 
+        if st.button("🔄 Recalcular precios de TODOS los productos", key="recalcular_todos_prod"):
+            try:
+                productos = pd.read_sql_query("SELECT id, margen, precio_costo FROM productos", conn)
+                cambios = 0
+                for _, prod in productos.iterrows():
+                    margen = float(prod["margen"])
+                    precio_costo = float(prod["precio_costo"])
+                    precio_final = round(precio_costo * margen, 2)
+                    precio_normalizado = float(redondeo_personalizado(precio_final))
+                    cursor.execute("""
+                        UPDATE productos
+                        SET precio_final = %s, precio_normalizado = %s
+                        WHERE id = %s
+                    """, (precio_final, precio_normalizado, int(prod["id"])))
+                    cambios += 1
+                conn.commit()
+                st.success(f"¡Precios recalculados en {cambios} productos!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ Ocurrió un error al recalcular precios: {e}")
+
+
+
+        
         cat_prod_df = pd.read_sql_query("SELECT * FROM categoria_productos", conn)
 
         if cat_prod_df.empty:
@@ -776,14 +800,29 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                         st.warning("Esta categoría no tiene subcategorías.")
 
                     # --- BOTÓN PARA ACTUALIZAR COSTO ---
-                    if st.button("Actualizar costo total del producto", key="actualizar_costo_prod"):
+                    if st.button("Actualizar costos y precios del producto", key="actualizar_costo_prod"):
                         try:
-                            cursor.execute("UPDATE productos SET precio_costo = %s WHERE id = %s", (float(costo_total), int(prod_id)))
+                            # 1. Traer margen actual
+                            cursor.execute("SELECT margen FROM productos WHERE id = %s", (int(prod_id),))
+                            margen_row = cursor.fetchone()
+                            margen = float(margen_row[0]) if margen_row else 1.0
+                    
+                            # 2. Calcular precios
+                            precio_final = round(float(costo_total) * margen, 2)
+                            precio_normalizado = float(redondeo_personalizado(precio_final))
+                    
+                            # 3. Actualizar costo y precios
+                            cursor.execute("""
+                                UPDATE productos
+                                SET precio_costo = %s, precio_final = %s, precio_normalizado = %s
+                                WHERE id = %s
+                            """, (float(costo_total), precio_final, precio_normalizado, int(prod_id)))
                             conn.commit()
-                            st.success("Precio de costo actualizado en el producto")
+                            st.success("Costo y precios actualizados en el producto")
                             st.rerun()
                         except Exception as e:
-                            st.error(f"❌ Ocurrió un error al actualizar el costo: {e}")
+                            st.error(f"❌ Ocurrió un error al actualizar el costo/precio: {e}")
+        
                 else:
                     st.warning("No hay productos en esta subcategoría.")
             else:
