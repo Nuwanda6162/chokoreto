@@ -544,7 +544,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                                         UPDATE productos
                                         SET nombre = %s, margen = %s, precio_final = %s, precio_normalizado = %s
                                         WHERE id = %s
-                                    """, (row["nombre"], row["margen"], precio_final, precio_normalizado, row["id"]))
+                                    """, (row["nombre"], float(row["margen"]), float(precio_final), float(precio_normalizado), int(row["id"])))
                                     conn.commit()
                                     cambios += 1
                                 except Exception as e:
@@ -583,7 +583,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                                 cursor.execute("""
                                         UPDATE productos SET nombre = %s, margen = %s, precio_final = %s, precio_normalizado = %s
                                         WHERE id = %s
-                                    """, (nuevo_nombre.strip(), nuevo_margen, precio_final, precio_normalizado, prod_id))
+                                    """, (nuevo_nombre.strip(), float(nuevo_margen), float(precio_final), float(precio_normalizado), int(prod_id)))
                                 conn.commit()
                                 st.success("Producto actualizado")
                                 st.rerun()
