@@ -778,7 +778,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                     # --- BOTÓN PARA ACTUALIZAR COSTO ---
                     if st.button("Actualizar costo total del producto", key="actualizar_costo_prod"):
                         try:
-                            cursor.execute("UPDATE productos SET precio_costo = %s WHERE id = %s", (float(precio_costo), int(prod_id)))
+                            cursor.execute("UPDATE productos SET precio_costo = %s WHERE id = %s", (float(costo_total), int(prod_id)))
                             conn.commit()
                             st.success("Precio de costo actualizado en el producto")
                             st.rerun()
