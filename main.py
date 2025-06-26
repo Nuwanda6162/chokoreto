@@ -918,8 +918,6 @@ elif seccion == "💵 Movimientos":
                     else:
                         descuento = 0.0
                     fecha_actual = st.date_input("Fecha de actualización", key="fecha_new")
-                    if "desc_libre" not in st.session_state:
-                        st.session_state["desc_libre"] = ""
                     descripcion_libre = st.text_area("Descripción (ej: reserva, evento, nota)", key="desc_libre")
         
                 # --- Cálculo de totales ---
@@ -962,7 +960,7 @@ elif seccion == "💵 Movimientos":
                                 st.session_state["tipo_pago"] = tipo_pago
                                 st.session_state['ultima_venta'] = f"{cantidad_val} × {producto['nombre']} ({categoria} / {subcategoria}) – ${total:,.2f} el {fecha_str}"
                                 st.success(f"✅ Venta registrada: {cantidad_val} × {producto['nombre']} – ${total:,.2f}")
-                                st.session_state["desc_libre"] = ""
+                                desc_libre = ""
                                 st.rerun()
                         except Exception as e:
                             st.error(f"❌ Ocurrió un error al registrar la venta: {e}")
