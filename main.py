@@ -574,7 +574,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                 nuevo_nombre = st.text_input("Nombre nuevo", key="nombre_nuevo_prod")
                 nuevo_margen = st.number_input("Margen de ganancia", min_value=0.0, step=0.1, key="margen_nuevo_prod")
     
-                if st.button("Guardar nuevo producto", key="guardar_nuevo_prod") and nuevo_nombre:
+                if st.button("Guardar nuevo producto", key="guardar_nuevo_prod"):
                     try:
                         # Cast seguro a float
                         margen_val = float(nuevo_margen)
