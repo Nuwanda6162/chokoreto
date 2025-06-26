@@ -836,7 +836,7 @@ elif seccion == "💵 Movimientos":
         "Registrar Gastos"
     ])
     with tab1:
-        st.title("📦 Registrar Venta (Rápido)")
+        st.title("📦 Registrar Venta")
         
         # Traer productos y buscador
         productos_full = pd.read_sql_query("""
@@ -922,8 +922,8 @@ elif seccion == "💵 Movimientos":
         
                 # --- Cálculo de totales ---
                 if es_ingreso_libre:
-                    precio_unitario_con_descuento = float(importe_libre)
-                    cantidad_val = 1
+                    precio_unitario_con_descuento = 1
+                    cantidad_val = importe_libre
                 else:
                     precio_unitario_con_descuento = round(precio_actual * (1 - descuento / 100), 2)
                     cantidad_val = cantidad
@@ -957,6 +957,7 @@ elif seccion == "💵 Movimientos":
                                     VALUES (%s, %s, %s, %s, %s, %s)
                                 """, (producto_id, cantidad_val, tipo_pago, fecha_str, precio_unitario_con_descuento, descripcion_libre))
                                 conn.commit()
+                                st.session_state["desc_libre"] = ""
                                 st.session_state["tipo_pago"] = tipo_pago
                                 st.session_state['ultima_venta'] = f"{cantidad_val} × {producto['nombre']} ({categoria} / {subcategoria}) – ${total:,.2f} el {fecha_str}"
                                 st.success(f"✅ Venta registrada: {cantidad_val} × {producto['nombre']} – ${total:,.2f}")
