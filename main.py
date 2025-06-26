@@ -1227,6 +1227,38 @@ elif seccion == "📉 Historial":
                 total_general = gastos_df["monto"].sum()
                 st.success(f"🧾 Total de gastos del período: **${round(total_general, 2)}**")
 
+                st.subheader("🗑️ Eliminar un gasto puntual")
+                
+                # Cargá de nuevo los gastos en el rango, con IDs
+                gastos_id_df = pd.read_sql_query("""
+                    SELECT id, fecha, descripcion, monto, categoria
+                    FROM gastos
+                    WHERE fecha BETWEEN %s AND %s
+                    ORDER BY fecha DESC
+                """, conn, params=(str(fecha_desde), str(fecha_hasta)))
+                
+                if not gastos_id_df.empty:
+                    gastos_id_df["info"] = (
+                        "ID " + gastos_id_df["id"].astype(str) +
+                        " – " + gastos_id_df["descripcion"] +
+                        " – " + gastos_id_df["fecha"] +
+                        " – $" + gastos_id_df["monto"].round(2).astype(str)
+                    )
+                    gasto_dict = dict(zip(gastos_id_df["info"], gastos_id_df["id"]))
+                
+                    gasto_sel = st.selectbox("Seleccioná el gasto a eliminar", list(gasto_dict.keys()), key="gasto_del_sel")
+                    gasto_id = gasto_dict[gasto_sel]
+                
+                    if st.button("❌ Eliminar este gasto", key="btn_eliminar_gasto"):
+                        try:
+                            cursor.execute("DELETE FROM gastos WHERE id = %s", (gasto_id,))
+                            conn.commit()
+                            st.success(f"Gasto ID {gasto_id} eliminado correctamente.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Ocurrió un error al eliminar el gasto: {e}")
+                else:
+                    st.info("No hay gastos para eliminar en este rango.")
     
     
     with tab3:
