@@ -837,7 +837,9 @@ elif seccion == "💵 Movimientos":
     ])
     with tab1:
         st.title("📦 Registrar Venta")
-        
+        if st.session_state.get("venta_recien_registrada", False):
+            st.session_state["desc_libre"] = ""
+            st.session_state["venta_recien_registrada"] = False
         # Traer productos y buscador
         productos_full = pd.read_sql_query("""
             SELECT p.id, p.nombre, p.precio_normalizado, 
@@ -960,7 +962,7 @@ elif seccion == "💵 Movimientos":
                                 st.session_state["tipo_pago"] = tipo_pago
                                 st.session_state['ultima_venta'] = f"{cantidad_val} × {producto['nombre']} ({categoria} / {subcategoria}) – ${total:,.2f} el {fecha_str}"
                                 st.success(f"✅ Venta registrada: {cantidad_val} × {producto['nombre']} – ${total:,.2f}")
-                                desc_libre = ""
+                                st.session_state["venta_recien_registrada"] = True
                                 st.rerun()
                         except Exception as e:
                             st.error(f"❌ Ocurrió un error al registrar la venta: {e}")
