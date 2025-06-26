@@ -204,7 +204,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                     conn.commit()
                     st.success("Materia prima guardada correctamente")
                     st.rerun()
-                except sqlite3.IntegrityError:
+                except psycopg2.IntegrityError:
                     st.error("❌ Ya existe una materia prima con ese nombre en esta subcategoría.")
                 except Exception as e:
                     st.error(f"❌ Ocurrió un error inesperado: {e}")
@@ -263,7 +263,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                     conn.commit()
                     st.success("¡Categoría agregada correctamente!")
                     st.rerun()
-                except sqlite3.IntegrityError:
+                except psycopg2.IntegrityError:
                     st.error("❌ Ya existe una categoría con ese nombre o hay un error de integridad.")
                 except Exception as e:
                     st.error(f"❌ Ocurrió un error inesperado: {e}")
@@ -333,7 +333,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                         conn.commit()
                         st.success("¡Subcategoría agregada!")
                         st.rerun()
-                    except sqlite3.IntegrityError:
+                    except psycopg2.IntegrityError:
                         st.error("❌ Ya existe una subcategoría con ese nombre en esa categoría.")
                     except Exception as e:
                         st.error(f"❌ Ocurrió un error inesperado: {e}")
@@ -390,7 +390,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                     conn.commit()
                     st.success("¡Categoría eliminada!")
                     st.rerun()
-                except sqlite3.IntegrityError:
+                except psycopg2.IntegrityError:
                     st.error("❌ No se puede eliminar: Hay subcategorías o productos asociados.")
                 except Exception as e:
                     st.error(f"❌ Ocurrió un error inesperado: {e}")
@@ -404,7 +404,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                 conn.commit()
                 st.success("¡Categoría agregada correctamente!")
                 st.rerun()
-            except sqlite3.IntegrityError:
+            except psycopg2.IntegrityError:
                 st.error("❌ Ya existe una categoría con ese nombre.")
             except Exception as e:
                 st.error(f"❌ Ocurrió un error inesperado: {e}")
@@ -476,7 +476,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                 conn.commit()
                 st.success("¡Subcategoría agregada!")
                 st.rerun()
-            except sqlite3.IntegrityError:
+            except psycopg2.IntegrityError:
                 st.error("❌ Ya existe una subcategoría con ese nombre en esa categoría.")
             except Exception as e:
                 st.error(f"❌ Ocurrió un error inesperado: {e}")
@@ -587,7 +587,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                                 conn.commit()
                                 st.success("Producto actualizado")
                                 st.rerun()
-                            except sqlite3.IntegrityError:
+                            except psycopg2.IntegrityError:
                                 st.error("❌ Ya existe un producto con ese nombre en esta subcategoría.")
                             except Exception as e:
                                 st.error(f"❌ Ocurrió un error al actualizar: {e}")
@@ -634,7 +634,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                         conn.commit()
                         st.success("Producto guardado correctamente")
                         st.rerun()
-                    except sqlite3.IntegrityError:
+                    except psycopg2.IntegrityError:
                         st.error("❌ Ya existe un producto con ese nombre en esta subcategoría.")
                     except Exception as e:
                         st.error(f"❌ Ocurrió un error inesperado: {e}")
@@ -799,7 +799,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                                     conn.commit()
                                     st.success("Ingrediente agregado")
                                     st.rerun()
-                                except sqlite3.IntegrityError:
+                                except psycopg2.IntegrityError:
                                     st.error("❌ Ya existe ese ingrediente en este producto.")
                                 except Exception as e:
                                     st.error(f"❌ Ocurrió un error inesperado: {e}")
