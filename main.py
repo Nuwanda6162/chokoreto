@@ -1143,7 +1143,7 @@ elif seccion == "📉 Historial":
 
     with tab2:
         # Gastos
-        st.title("📊 Visor de Gastos (editable)")
+        st.title("📊 Visor de Gastos")
         
         col1, col2 = st.columns(2)
         with col1:
@@ -1164,43 +1164,52 @@ elif seccion == "📉 Historial":
             if gastos_df.empty:
                 st.info("No se encontraron gastos en el rango seleccionado.")
             else:
+                # ---- Setup y chequeo de tipos ----
                 edit_cols = ["fecha", "descripcion", "monto", "categoria"]
                 editable_df = gastos_df[["id"] + edit_cols].copy()
+        
+                editable_df["fecha"] = pd.to_datetime(editable_df["fecha"], errors="coerce").dt.date
+                categorias_validas = ["Insumos", "Alquiler", "Electricidad", "Internet", "Otros"]
+                if not editable_df["categoria"].isin(categorias_validas).all():
+                    editable_df.loc[~editable_df["categoria"].isin(categorias_validas), "categoria"] = categorias_validas[0]
+                editable_df["monto"] = editable_df["monto"].astype(float)
+                editable_df = editable_df.fillna({"descripcion": ""})
         
                 column_config = {
                     "id": st.column_config.Column("ID", disabled=True),
                     "fecha": st.column_config.DateColumn("Fecha"),
                     "descripcion": st.column_config.TextColumn("Descripción"),
                     "monto": st.column_config.NumberColumn("Monto", min_value=0.0, step=10.0),
-                    "categoria": st.column_config.SelectboxColumn("Categoría", options=["Insumos", "Alquiler", "Electricidad", "Internet", "Otros"]),
+                    "categoria": st.column_config.SelectboxColumn("Categoría", options=categorias_validas),
                 }
         
-                edited = st.data_editor(
-                    editable_df,
-                    column_config=column_config,
-                    num_rows="dynamic",
-                    key="gastos_editor"
-                )
+                with st.expander("Editar gastos (abrir solo si necesitás cambiar algo)", expanded=False):
+                    edited = st.data_editor(
+                        editable_df,
+                        column_config=column_config,
+                        num_rows="dynamic",
+                        key="gastos_editor"
+                    )
         
-                if st.button("💾 Guardar cambios en gastos"):
-                    cambios = 0
-                    for idx, row in edited.iterrows():
-                        orig_row = editable_df.loc[idx]
-                        if not (row == orig_row).all():
-                            cursor.execute("""
-                                UPDATE gastos
-                                SET fecha = %s, descripcion = %s, monto = %s, categoria = %s
-                                WHERE id = %s
-                            """, (row["fecha"], row["descripcion"], row["monto"], row["categoria"], row["id"]))
-                            cambios += 1
-                    conn.commit()
-                    if cambios:
-                        st.success(f"¡Se guardaron {cambios} cambios en gastos!")
-                        st.rerun()
-                    else:
-                        st.info("No hubo cambios para guardar.")
+                    if st.button("💾 Guardar cambios en gastos"):
+                        cambios = 0
+                        for idx, row in edited.iterrows():
+                            orig_row = editable_df.loc[idx]
+                            if not (row == orig_row).all():
+                                cursor.execute("""
+                                    UPDATE gastos
+                                    SET fecha = %s, descripcion = %s, monto = %s, categoria = %s
+                                    WHERE id = %s
+                                """, (row["fecha"], row["descripcion"], row["monto"], row["categoria"], row["id"]))
+                                cambios += 1
+                        conn.commit()
+                        if cambios:
+                            st.success(f"¡Se guardaron {cambios} cambios en gastos!")
+                            st.rerun()
+                        else:
+                            st.info("No hubo cambios para guardar.")
         
-                # --- Muestra la tabla con totales ---
+                # --- Tabla de historial (no editable) ---
                 gastos_df = pd.read_sql_query("""
                     SELECT fecha, descripcion, monto, categoria
                     FROM gastos
@@ -1209,6 +1218,7 @@ elif seccion == "📉 Historial":
                 """, conn, params=(str(fecha_desde), str(fecha_hasta)))
                 st.dataframe(gastos_df)
         
+                # --- Totales por día ---
                 total_dia = gastos_df.groupby("fecha")["monto"].sum().reset_index()
                 total_dia.columns = ["Fecha", "Total del día"]
                 st.subheader("💰 Total de gastos por día")
