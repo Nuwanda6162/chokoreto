@@ -537,7 +537,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                         key="data_editor_prods"
                     )
     
-                    if st.button("💾 Guardar cambios en productos")
+                    if st.button("💾 Guardar cambios en productos"):
                         cambios = 0
                         for idx, row in edited.iterrows():
                             orig_row = editable_prods.loc[idx]
