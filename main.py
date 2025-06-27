@@ -44,11 +44,11 @@ cursor = conn.cursor()
 # Funcion de redondeo
 def redondeo_personalizado(valor):
     if valor < 1000:
-        return math.ceil(valor / 10.0) * 10
+        return round(valor / 10.0) * 10
     elif valor < 10000:
-        return math.ceil(valor / 100.0) * 100
+        return round(valor / 100.0) * 100
     else:
-        return math.ceil(valor / 1000.0) * 1000
+        return round(valor / 1000.0) * 1000
 
 
 st.set_page_config(page_title="Chokoreto App", layout="wide")
@@ -1452,37 +1452,38 @@ elif seccion == "📉 Reportes":
         
         st.header("🍫 Ranking de chocolates por precio por gramo")
         
-        # --- Suposición: solo productos con "chocolate" en el nombre, subcat o cat ---
-        filtro_choco = productos_df[
-            productos_df["nombre"].str.lower().str.contains("choco") |
-            productos_df["subcategoria"].str.lower().str.contains("choco") |
-            productos_df["categoria"].str.lower().str.contains("choco")
+        # --- Filtro: productos que contengan "choco" en nombre/categoría/subcat ---
+        productos_full = pd.read_sql_query("""
+        SELECT p.nombre, cp.nombre AS categoria, sp.nombre AS subcategoria, p.precio_normalizado, p.precio_por_unidad
+        FROM productos p
+        JOIN subcategorias_productos sp ON p.subcategoria_id = sp.id
+        JOIN categoria_productos cp ON sp.categoria_id = cp.id
+        """, conn)
+        
+        # Filtrá solo los chocolates (ajustá el criterio si hace falta)
+        choco_df = productos_full[
+            productos_full["nombre"].str.lower().str.contains("choco") |
+            productos_full["categoria"].str.lower().str.contains("choco") |
+            productos_full["subcategoria"].str.lower().str.contains("choco")
         ].copy()
         
-        # --- Necesitás conocer el peso de cada producto (en gramos) ---
-        # Suponemos que existe una columna 'peso_gramos' (si no existe, adaptalo!)
-        if "peso_gramos" not in filtro_choco.columns:
-            filtro_choco["peso_gramos"] = None  # Ajustalo si tenés el dato en otra tabla/campo
-        
-        # Si no hay el dato, mostrá una advertencia y tabla incompleta
-        if filtro_choco["peso_gramos"].isnull().all():
-            st.warning("Falta cargar el peso en gramos para los productos. Completá ese campo para calcular precio por gramo.")
+        # Mostrá el ranking
+        if choco_df.empty:
+            st.info("No hay productos de chocolate cargados o no cumplen el criterio de búsqueda.")
         else:
-            filtro_choco = filtro_choco.dropna(subset=["peso_gramos"])
-            filtro_choco["precio_por_gramo"] = filtro_choco["precio_normalizado"] / filtro_choco["peso_gramos"]
-            filtro_choco = filtro_choco.sort_values("precio_por_gramo", ascending=True)
-            st.dataframe(filtro_choco[["nombre", "categoria", "subcategoria", "precio_normalizado", "peso_gramos", "precio_por_gramo"]]
-                         .rename(columns={
-                             "nombre": "Producto",
-                             "categoria": "Categoría",
-                             "subcategoria": "Subcategoría",
-                             "precio_normalizado": "Precio Normalizado",
-                             "peso_gramos": "Peso (g)",
-                             "precio_por_gramo": "Precio por gramo"
-                         }),
-                         hide_index=True)
-        
-        st.caption("💡 Para tener el ranking correcto de chocolates, asegurate de tener cargado el peso en gramos en todos los productos de chocolate.")
+            choco_df = choco_df.sort_values("precio_por_unidad", ascending=True)
+            choco_df = choco_df.rename(columns={
+                "nombre": "Producto",
+                "categoria": "Categoría",
+                "subcategoria": "Subcategoría",
+                "precio_normalizado": "Precio Normalizado",
+                "precio_por_unidad": "Precio por gramo"
+            })
+            st.dataframe(
+                choco_df[["Producto", "Categoría", "Subcategoría", "Precio Normalizado", "Precio por gramo"]],
+                hide_index=True
+            )
+
 
 
 
