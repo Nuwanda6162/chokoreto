@@ -1006,12 +1006,14 @@ elif seccion == "💵 Movimientos":
 # =========================
 
 elif seccion == "📉 Reportes":
-    st.title("Historial de ventas y gastos")
-    tab1, tab2, tab3, tab4 = st.tabs([
+    st.title("📉 Reportes")
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "Ventas",
         "Gastos",
         "Dashboard",
-        "📊 Reportes Avanzados"
+        "📊 Reportes Avanzados",
+        "🍫 Ranking de chocolates por precio por gramo"
+        
     ])
     with tab1:
         st.title("📈 Visor de Ventas (editable)")
@@ -1364,7 +1366,7 @@ elif seccion == "📉 Reportes":
         
     with tab4:
         # =========================================
-        # REPORTES AVANZADOS – PRODUCTOS Y CHOCOLATES
+        # REPORTES AVANZADOS – PRODUCTOS
         # =========================================
         
         st.title("📊 Reportes Avanzados")
@@ -1443,6 +1445,7 @@ elif seccion == "📉 Reportes":
         
         st.dataframe(rep_df, height=500, hide_index=True)
         
+    with tab5:
         # -----------------------------------------
         # 2. REPORTE PRECIO POR GRAMO – CHOCOLATES
         # -----------------------------------------
