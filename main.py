@@ -55,7 +55,7 @@ st.set_page_config(page_title="Chokoreto App", layout="wide")
 st.sidebar.title("Menú")
 seccion = st.sidebar.radio("Ir a:", [
     "💵 Movimientos",
-    "📉 Historial",
+    "📉 Reportes",
     "🧪 Simulador de productos",
     "🛠️ ABM (Gestión de Datos)"
 ])
@@ -1002,15 +1002,16 @@ elif seccion == "💵 Movimientos":
 
 
 # =========================
-# Historial de Ventas y Gastos
+# Reportes de Ventas, gastos, etc
 # =========================
 
-elif seccion == "📉 Historial":
+elif seccion == "📉 Reportes":
     st.title("Historial de ventas y gastos")
     tab1, tab2, tab3 = st.tabs([
         "Ventas",
         "Gastos",
-        "Dashboard"
+        "Dashboard",
+        "📊 Reportes Avanzados"
     ])
     with tab1:
         st.title("📈 Visor de Ventas (editable)")
@@ -1361,6 +1362,124 @@ elif seccion == "📉 Historial":
         with st.expander("Ver tabla completa de gastos"):
             st.dataframe(gastos_df)
         
+    with tab4:
+        # =========================================
+        # REPORTES AVANZADOS – PRODUCTOS Y CHOCOLATES
+        # =========================================
+        
+        st.title("📊 Reportes Avanzados")
+        
+        # -----------------------------------------
+        # 1. REPORTE GENERAL DE PRODUCTOS Y VENTAS
+        # -----------------------------------------
+        
+        st.header("📦 Resumen de productos, ventas y filtros")
+        
+        # --- Filtros dinámicos de fecha ---
+        col1, col2 = st.columns(2)
+        with col1:
+            fecha_desde = st.date_input("Fecha desde (opcional)", value=None, key="filtro_fecha_desde")
+        with col2:
+            fecha_hasta = st.date_input("Fecha hasta (opcional)", value=None, key="filtro_fecha_hasta")
+        
+        # --- Filtros dinámicos de categoría/subcategoría ---
+        categorias = pd.read_sql_query("SELECT id, nombre FROM categoria_productos ORDER BY nombre", conn)
+        subcategorias = pd.read_sql_query("SELECT id, nombre, categoria_id FROM subcategorias_productos", conn)
+        
+        # Opciones "Ver todos"
+        cat_opciones = ["(Ver todas)"] + categorias["nombre"].tolist()
+        cat_sel = st.selectbox("Filtrar por categoría", cat_opciones, key="filtro_categoria")
+        if cat_sel == "(Ver todas)":
+            cat_ids = categorias["id"].tolist()
+        else:
+            cat_ids = [int(categorias[categorias["nombre"] == cat_sel]["id"].iloc[0])]
+        
+        # Filtra subcats por categoría elegida
+        subcat_opciones = ["(Ver todas)"]
+        if cat_sel == "(Ver todas)":
+            subcat_opciones += subcategorias["nombre"].tolist()
+        else:
+            subcat_opciones += subcategorias[subcategorias["categoria_id"].isin(cat_ids)]["nombre"].tolist()
+        subcat_sel = st.selectbox("Filtrar por subcategoría", subcat_opciones, key="filtro_subcat")
+        
+        if subcat_sel == "(Ver todas)":
+            subcat_ids = subcategorias[subcategorias["categoria_id"].isin(cat_ids)]["id"].tolist()
+        else:
+            subcat_ids = [int(subcategorias[subcategorias["nombre"] == subcat_sel]["id"].iloc[0])]
+        
+        # --- Traé todos los productos filtrados ---
+        productos_query = """
+        SELECT p.id, p.nombre, cp.nombre AS categoria, sp.nombre AS subcategoria,
+               p.precio_costo, p.margen, p.precio_final, p.precio_normalizado
+        FROM productos p
+        JOIN subcategorias_productos sp ON p.subcategoria_id = sp.id
+        JOIN categoria_productos cp ON sp.categoria_id = cp.id
+        WHERE sp.id = ANY(%s)
+        """
+        productos_df = pd.read_sql_query(productos_query, conn, params=(subcat_ids,))
+        
+        # --- Traé ventas (en el rango pedido, si hay filtro) ---
+        ventas_query = """
+        SELECT v.producto_id, SUM(v.cantidad) AS cantidad_vendida, SUM(v.cantidad * v.precio_unitario) AS total_vendido
+        FROM ventas v
+        WHERE v.producto_id = ANY(%s)
+        """
+        ventas_params = [productos_df["id"].tolist()]
+        if fecha_desde and fecha_hasta:
+            ventas_query += " AND v.fecha BETWEEN %s AND %s"
+            ventas_params += [str(fecha_desde), str(fecha_hasta)]
+        ventas_query += " GROUP BY v.producto_id"
+        
+        ventas_df = pd.read_sql_query(ventas_query, conn, params=ventas_params) if not productos_df.empty else pd.DataFrame(columns=["producto_id", "cantidad_vendida", "total_vendido"])
+        
+        # --- Merge productos y ventas ---
+        rep_df = productos_df.merge(ventas_df, left_on="id", right_on="producto_id", how="left").fillna({"cantidad_vendida": 0, "total_vendido": 0})
+        rep_df["cantidad_vendida"] = rep_df["cantidad_vendida"].astype(int)
+        rep_df["total_vendido"] = rep_df["total_vendido"].astype(float)
+        
+        # --- Reordena y muestra la tabla ---
+        rep_df = rep_df[["categoria", "subcategoria", "nombre", "precio_costo", "margen", "precio_final", "precio_normalizado", "cantidad_vendida", "total_vendido"]]
+        rep_df.columns = ["Categoría", "Subcategoría", "Producto", "Costo", "Margen", "Precio Final", "Precio Normalizado", "Vendidos", "Total vendido"]
+        
+        st.dataframe(rep_df, height=500, hide_index=True)
+        
+        # -----------------------------------------
+        # 2. REPORTE PRECIO POR GRAMO – CHOCOLATES
+        # -----------------------------------------
+        
+        st.header("🍫 Ranking de chocolates por precio por gramo")
+        
+        # --- Suposición: solo productos con "chocolate" en el nombre, subcat o cat ---
+        filtro_choco = productos_df[
+            productos_df["nombre"].str.lower().str.contains("choco") |
+            productos_df["subcategoria"].str.lower().str.contains("choco") |
+            productos_df["categoria"].str.lower().str.contains("choco")
+        ].copy()
+        
+        # --- Necesitás conocer el peso de cada producto (en gramos) ---
+        # Suponemos que existe una columna 'peso_gramos' (si no existe, adaptalo!)
+        if "peso_gramos" not in filtro_choco.columns:
+            filtro_choco["peso_gramos"] = None  # Ajustalo si tenés el dato en otra tabla/campo
+        
+        # Si no hay el dato, mostrá una advertencia y tabla incompleta
+        if filtro_choco["peso_gramos"].isnull().all():
+            st.warning("Falta cargar el peso en gramos para los productos. Completá ese campo para calcular precio por gramo.")
+        else:
+            filtro_choco = filtro_choco.dropna(subset=["peso_gramos"])
+            filtro_choco["precio_por_gramo"] = filtro_choco["precio_normalizado"] / filtro_choco["peso_gramos"]
+            filtro_choco = filtro_choco.sort_values("precio_por_gramo", ascending=True)
+            st.dataframe(filtro_choco[["nombre", "categoria", "subcategoria", "precio_normalizado", "peso_gramos", "precio_por_gramo"]]
+                         .rename(columns={
+                             "nombre": "Producto",
+                             "categoria": "Categoría",
+                             "subcategoria": "Subcategoría",
+                             "precio_normalizado": "Precio Normalizado",
+                             "peso_gramos": "Peso (g)",
+                             "precio_por_gramo": "Precio por gramo"
+                         }),
+                         hide_index=True)
+        
+        st.caption("💡 Para tener el ranking correcto de chocolates, asegurate de tener cargado el peso en gramos en todos los productos de chocolate.")
 
 
 
