@@ -50,6 +50,14 @@ def redondeo_personalizado(valor):
     else:
         return round(valor / 1000.0) * 1000
 
+def redondeo_personalizadov2(valor):
+    if valor < 1000:
+        return round(valor / 10.0) * 10
+    elif valor < 10000:
+        return round(valor / 100.0) * 100
+    else:
+        return round(valor / 1000.0) * 1000
+
 
 st.set_page_config(page_title="Chokoreto App", layout="wide")
 st.sidebar.title("Menú")
@@ -617,7 +625,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                     margen = float(prod["margen"])
                     precio_costo = float(prod["precio_costo"])
                     precio_final = round(precio_costo * margen, 2)
-                    precio_normalizado = float(redondeo_personalizado(precio_final))
+                    precio_normalizado = float(redondeo_personalizadov2(precio_final))
                     cursor.execute("""
                         UPDATE productos
                         SET precio_final = %s, precio_normalizado = %s
