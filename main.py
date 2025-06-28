@@ -620,7 +620,38 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                         st.error(f"❌ Error de integridad: {e}")
                     except Exception as e:
                         st.error(f"❌ Ocurrió un error inesperado: {e}")
-    
+
+
+                # --- Eliminar producto ---
+                st.subheader("❌ Eliminar producto")
+                # Cargá productos de la subcategoría seleccionada (así solo aparecen los relevantes)
+                productos_borrar_df = pd.read_sql_query("""
+                    SELECT id, nombre FROM productos WHERE subcategoria_id = %s
+                """, conn, params=(sub_id,))
+                if productos_borrar_df.empty:
+                    st.info("No hay productos para eliminar en esta subcategoría.")
+                else:
+                    prod_dict = dict(zip(productos_borrar_df["nombre"], productos_borrar_df["id"]))
+                    prod_borrar_sel = st.selectbox("Seleccioná el producto a eliminar", sorted(prod_dict.keys()), key="prod_borrar_sel")
+                    prod_borrar_id = prod_dict[prod_borrar_sel]
+                    st.warning("⚠️ Esta acción eliminará el producto **y TODAS las ventas e ingredientes asociados**. No se puede deshacer.")
+            
+                    confirmar = st.checkbox("Confirmo que deseo eliminar este producto y sus datos relacionados", key="chk_confirm_del_prod")
+                    if confirmar:
+                        if st.button("❌ Eliminar producto seleccionado", key="btn_eliminar_prod"):
+                            try:
+                                # Primero borrar ingredientes y ventas asociados (si tu base no borra en cascada)
+                                cursor.execute("DELETE FROM ingredientes_producto WHERE producto_id = %s", (prod_borrar_id,))
+                                cursor.execute("DELETE FROM ventas WHERE producto_id = %s", (prod_borrar_id,))
+                                cursor.execute("DELETE FROM productos WHERE id = %s", (prod_borrar_id,))
+                                conn.commit()
+                                st.success("Producto y registros asociados eliminados correctamente.")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ Ocurrió un error al eliminar: {e}")
+
+            
+            
             else:
                 st.warning("Esta categoría no tiene subcategorías.")
         else:
