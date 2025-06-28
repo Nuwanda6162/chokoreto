@@ -1499,39 +1499,28 @@ elif seccion == "📉 Reportes":
         # 2. REPORTE PRECIO POR GRAMO – CHOCOLATES
         # -----------------------------------------
         
-        st.header("🍫 Ranking de chocolates por precio por gramo")
+        st.header("🍫 Ranking de chocolates por precio por gramo (materias primas)")
         
-        # --- Filtro: productos que contengan "choco" en nombre/categoría/subcat ---
-        productos_full = pd.read_sql_query("""
-        SELECT p.nombre, cp.nombre AS categoria, sp.nombre AS subcategoria, p.precio_normalizado, p.precio_por_unidad
-        FROM productos p
-        JOIN subcategorias_productos sp ON p.subcategoria_id = sp.id
-        JOIN categoria_productos cp ON sp.categoria_id = cp.id
+        # Traé las materias primas con categoría "Chocolate"
+        mp_df = pd.read_sql_query("""
+            SELECT mp.nombre, cat.nombre AS categoria, mp.precio_por_unidad
+            FROM materias_primas mp
+            JOIN subcategorias_mp sub ON mp.subcategoria_id = sub.id
+            JOIN categorias_mp cat ON sub.categoria_id = cat.id
+            WHERE LOWER(cat.nombre) = 'chocolate'
+            ORDER BY mp.precio_por_unidad ASC
         """, conn)
         
-        # Filtrá solo los chocolates (ajustá el criterio si hace falta)
-        choco_df = productos_full[
-            productos_full["nombre"].str.lower().str.contains("choco") |
-            productos_full["categoria"].str.lower().str.contains("choco") |
-            productos_full["subcategoria"].str.lower().str.contains("choco")
-        ].copy()
-        
-        # Mostrá el ranking
-        if choco_df.empty:
-            st.info("No hay productos de chocolate cargados o no cumplen el criterio de búsqueda.")
+        if mp_df.empty:
+            st.info("No hay materias primas de chocolate cargadas en la base.")
         else:
-            choco_df = choco_df.sort_values("precio_por_unidad", ascending=True)
-            choco_df = choco_df.rename(columns={
-                "nombre": "Producto",
+            mp_df = mp_df.rename(columns={
+                "nombre": "Materia Prima",
                 "categoria": "Categoría",
-                "subcategoria": "Subcategoría",
-                "precio_normalizado": "Precio Normalizado",
                 "precio_por_unidad": "Precio por gramo"
             })
-            st.dataframe(
-                choco_df[["Producto", "Categoría", "Subcategoría", "Precio Normalizado", "Precio por gramo"]],
-                hide_index=True
-            )
+            st.dataframe(mp_df[["Materia Prima", "Precio por gramo"]], hide_index=True)
+
 
 
 
