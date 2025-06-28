@@ -511,7 +511,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
     
                 # --- PRODUCTOS CON PRECIOS VISIBLES Y EDITABLES ---
                 productos_df = pd.read_sql_query("""
-                    SELECT id, nombre, margen, precio_costo, precio_final, precio_normalizado
+                    SELECT id, nombre, margen, precio_costo, precio_final, precio_normalizado, descripcion
                     FROM productos
                     WHERE subcategoria_id = %s
                 """, conn, params=(sub_id,))
@@ -521,7 +521,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                 else:
                     st.subheader("Editar productos (tipo Excel)")
     
-                    editable_cols = ["id", "nombre", "margen", "precio_costo", "precio_final", "precio_normalizado"]
+                    editable_cols = ["id", "nombre", "margen", "precio_costo", "precio_final", "precio_normalizado", "descripcion"]
                     editable_prods = productos_df[editable_cols].copy()
     
                     # Casts seguros para todos los valores
@@ -530,6 +530,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                     editable_prods["precio_final"] = editable_prods["precio_final"].astype(float)
                     editable_prods["precio_normalizado"] = editable_prods["precio_normalizado"].astype(float)
                     editable_prods["id"] = editable_prods["id"].astype(int)
+                    editable_prods["descripcion"] = editable_prods["descripcion"].fillna("")
     
                     edited = st.data_editor(
                         editable_prods,
@@ -540,6 +541,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                             "precio_costo": st.column_config.NumberColumn("Costo", disabled=True),
                             "precio_final": st.column_config.NumberColumn("Precio Final", disabled=True),
                             "precio_normalizado": st.column_config.NumberColumn("Normalizado", disabled=True),
+                            "descripcion": st.column_config.TextColumn("Descripción / Notas")
                         },
                         num_rows="dynamic",
                         key="data_editor_prods"
@@ -549,19 +551,24 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                         cambios = 0
                         for idx, row in edited.iterrows():
                             orig_row = editable_prods.loc[idx]
-                            if row["nombre"] != orig_row["nombre"] or not math.isclose(float(row["margen"]), float(orig_row["margen"])):
+                            if (
+                                row["nombre"] != orig_row["nombre"] or
+                                not math.isclose(float(row["margen"]), float(orig_row["margen"])) or
+                                row["descripcion"] != orig_row["descripcion"]
+                            ):
                                 try:
                                     nombre = row["nombre"]
                                     margen = float(row["margen"])
+                                    descripcion = row["descripcion"] or ""
                                     precio_costo = float(row["precio_costo"]) if row["precio_costo"] else 0.0
                                     precio_final = round(precio_costo * margen, 2)
                                     precio_normalizado = float(redondeo_personalizado(precio_final))
                                     prod_id = int(row["id"])
                                     cursor.execute("""
                                         UPDATE productos
-                                        SET nombre = %s, margen = %s, precio_final = %s, precio_normalizado = %s
+                                        SET nombre = %s, margen = %s, precio_final = %s, precio_normalizado = %s, descripcion = %s
                                         WHERE id = %s
-                                    """, (nombre, margen, precio_final, precio_normalizado, prod_id))
+                                    """, (nombre, margen, precio_final, precio_normalizado, descripcion, prod_id))
                                     conn.commit()
                                     cambios += 1
                                 except psycopg2.IntegrityError:
@@ -575,25 +582,26 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                         else:
                             st.info("No hubo cambios para guardar.")
     
-                    st.caption("Editá nombre y margen. Los precios se actualizan solos al guardar.")
+                    st.caption("Editá nombre, margen o notas. Los precios se actualizan solos al guardar.")
     
                 # --- Agregar nuevo producto ---
                 st.subheader("Agregar nuevo producto")
                 nuevo_nombre = st.text_input("Nombre nuevo", key="nombre_nuevo_prod")
                 nuevo_margen = st.number_input("Margen de ganancia", min_value=0.0, step=0.1, key="margen_nuevo_prod")
+                nueva_descripcion = st.text_area("Descripción / Notas", key="descripcion_nuevo_prod")
     
                 if st.button("Guardar nuevo producto", key="guardar_nuevo_prod"):
                     try:
                         # Cast seguro a float
                         margen_val = float(nuevo_margen)
+                        descripcion_val = nueva_descripcion or ""
                         precio_costo = 0.0  # como aún no hay ingredientes cargados
                         precio_final = round(precio_costo * margen_val, 2)
                         precio_normalizado = float(redondeo_personalizado(precio_final))
-                        print("INSERT:", nuevo_nombre.strip(), margen_val, int(cat_df[cat_df["nombre"] == cat_sel]["id"].values[0]), int(sub_dict[sub_sel]), precio_costo, precio_final, precio_normalizado)
-
+    
                         cursor.execute("""
-                            INSERT INTO productos (nombre, margen, categoria_id, subcategoria_id, precio_costo, precio_final, precio_normalizado)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                            INSERT INTO productos (nombre, margen, categoria_id, subcategoria_id, precio_costo, precio_final, precio_normalizado, descripcion)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                         """, (
                             nuevo_nombre.strip(),
                             margen_val,
@@ -601,7 +609,8 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                             int(sub_dict[sub_sel]),
                             precio_costo,
                             precio_final,
-                            precio_normalizado
+                            precio_normalizado,
+                            descripcion_val
                         ))
                         conn.commit()
                         st.success("Producto guardado correctamente")
@@ -616,7 +625,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                 st.warning("Esta categoría no tiene subcategorías.")
         else:
             st.warning("No hay categorías de productos cargadas.")
-
+    
         if st.button("🔄 Recalcular precios de TODOS los productos", key="recalcular_todos_prod"):
             try:
                 productos = pd.read_sql_query("SELECT id, margen, precio_costo FROM productos", conn)
@@ -625,7 +634,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                     margen = float(prod["margen"])
                     precio_costo = float(prod["precio_costo"])
                     precio_final = round(precio_costo * margen, 2)
-                    precio_normalizado = float(redondeo_personalizadov2(precio_final))
+                    precio_normalizado = float(redondeo_personalizado(precio_final))
                     cursor.execute("""
                         UPDATE productos
                         SET precio_final = %s, precio_normalizado = %s
@@ -637,6 +646,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                 st.rerun()
             except Exception as e:
                 st.error(f"❌ Ocurrió un error al recalcular precios: {e}")
+
 
     
     with tab5:
