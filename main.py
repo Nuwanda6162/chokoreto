@@ -43,20 +43,10 @@ cursor = conn.cursor()
 
 # Funcion de redondeo
 def redondeo_personalizado(valor):
-    if valor < 1000:
-        return math.ceil(valor / 10.0) * 10
-    elif valor < 10000:
-        return math.ceil(valor / 100.0) * 100
-    else:
-        return math.ceil(valor / 100.0) * 100
+    return math.ceil(valor / 100.0) * 100
 
 def redondeo_personalizadov2(valor):
-    if valor < 1000:
-        return math.ceil(valor / 10.0) * 10
-    elif valor < 10000:
-        return math.ceil(valor / 100.0) * 100
-    else:
-        return math.ceil(valor / 100.0) * 100
+    return math.ceil(valor / 100.0) * 100
 
 
 st.set_page_config(page_title="Chokoreto App", layout="wide")
