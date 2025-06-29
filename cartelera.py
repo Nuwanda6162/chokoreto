@@ -56,8 +56,12 @@ if prod_filtrados.empty:
 else:
     # --- Mostrar en grid elegante ---
     cols = st.columns(3)
+    nro_wsp = "5491157995294"  
+    
     for i, (_, row) in enumerate(prod_filtrados.iterrows()):
         with cols[i % 3]:
+            mensaje = f"Hola! Quiero consultar por el producto: {row['nombre']}"
+            link_wsp = f"https://wa.me/{nro_wsp}?text={mensaje.replace(' ', '%20')}"
             st.markdown(
                 f"""
                 <div style='background:#fff; border-radius:18px; box-shadow:0 2px 8px #eee; margin-bottom:26px; overflow:hidden;'>
@@ -66,7 +70,12 @@ else:
                         <span style='font-size:1.1em; font-weight:bold; color:#64451d;'>{row["nombre"]}</span><br>
                         <span style='font-size:0.96em; color:#977a51;'>{row["categoria"]} – {row["subcategoria"]}</span><br>
                         <span style='font-size:2em; color:#be8725; font-weight:bold;'>${row["precio"]:,.0f}</span><br>
-                        <span style='color:#444;'>{row["descripcion"]}</span>
+                        <span style='color:#444;'>{row["descripcion"]}</span><br>
+                        <a href="{link_wsp}" target="_blank" style="text-decoration:none;">
+                            <button style="background:#25d366; color:white; border:none; padding:8px 18px; border-radius:7px; margin-top:10px; font-size:1em; cursor:pointer;">
+                                📲 Consultar por WhatsApp
+                            </button>
+                        </a>
                     </div>
                 </div>
                 """,
