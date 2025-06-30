@@ -154,7 +154,7 @@ if st.session_state["producto_seleccionado"] is not None:
 
     if st.button("⬅️ Volver al listado", type="primary"):
         st.session_state["producto_seleccionado"] = None
-        st.experimental_rerun()
+        st.rerun()
 
 # --- Si NO hay producto seleccionado, mostrar el grid (catálogo) ---
 else:
@@ -169,7 +169,7 @@ else:
                 # El truco: cuando hace click en el nombre, se guarda el producto seleccionado en session_state
                 if st.button(f"👀 {row['nombre']}", key=f"vermas_{i}"):
                     st.session_state["producto_seleccionado"] = row
-                    st.experimental_rerun()
+                    st.rerun()
                 st.image(row["foto_principal"], width=260)
                 st.markdown(
                     f"""
