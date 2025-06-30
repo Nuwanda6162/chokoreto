@@ -4,9 +4,9 @@ import pandas as pd
 st.set_page_config(page_title="Chokoreto – Cartelera Visual", layout="wide")
 st.title("🍫 Chokoreto – Cartelera de Productos Premium")
 
-nro_wsp = "5491157995294"  
-# --- DATOS DEMO: productos con fotos random, maridaje, clientes ---
+nro_wsp = "5491123456789"
 
+# --- DATOS DEMO ---
 bombon_fotos = [
     "https://images.unsplash.com/photo-1519864600265-abb23847ef2c?auto=format&fit=crop&w=400&q=80",
     "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?auto=format&fit=crop&w=400&q=80",
@@ -105,47 +105,84 @@ if busqueda:
         filtro["subcategoria"].str.lower().str.contains(busqueda)
     ]
 
-if filtro.empty:
-    st.warning("No hay productos que coincidan con tu búsqueda.")
+# --- CONTROL DE PANTALLA: producto seleccionado ---
+if "producto_seleccionado" not in st.session_state:
+    st.session_state["producto_seleccionado"] = None
+
+# --- Mostrar pantalla de detalle si corresponde ---
+if st.session_state["producto_seleccionado"] is not None:
+    prod = st.session_state["producto_seleccionado"]
+    st.markdown(
+        f"""
+        <div style='background:#fff; border-radius:18px; box-shadow:0 2px 18px #d0b689; margin-bottom:26px; overflow:hidden;'>
+            <img src="{prod['foto_principal']}" style='width:100%; aspect-ratio:1.9; object-fit:cover; border-radius:16px 16px 0 0;' alt='foto producto'/>
+            <div style='padding:24px 32px 16px 32px;'>
+                <span style='font-size:2em; font-weight:bold; color:#64451d;'>{prod["nombre"]}</span><br>
+                <span style='font-size:1.1em; color:#977a51;'>{prod["categoria"]} – {prod["subcategoria"]}</span><br>
+                <span style='font-size:3em; color:#be8725; font-weight:bold;'>${prod["precio"]:,.0f}</span><br>
+                <span style='font-size:1.1em; color:#444;'>{prod["descripcion"]}</span><br>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    st.subheader("Galería de producto")
+    st.image(prod["galeria"], width=230, caption=[f"{prod['nombre']} {i+1}" for i in range(len(prod["galeria"]))])
+
+    st.markdown("---")
+    st.subheader("Maridaje sugerido")
+    st.markdown(f"🥃 {prod['maridaje']}")
+
+    st.markdown("---")
+    st.subheader("Fotos con clientes")
+    st.image(prod["fotos_clientes"], width=90, caption=[f"Cliente {i+1}" for i in range(len(prod["fotos_clientes"]))])
+
+    mensaje = f"Hola! Quiero consultar por el producto: {prod['nombre']}"
+    link_wsp = f"https://wa.me/{nro_wsp}?text={mensaje.replace(' ', '%20')}"
+    st.markdown(
+        f"""
+        <a href="{link_wsp}" target="_blank" style="text-decoration:none;">
+            <button style="background:#25d366; color:white; border:none; padding:11px 38px; border-radius:9px; margin-top:22px; font-size:1.3em; cursor:pointer;">
+                📲 Consultar por WhatsApp
+            </button>
+        </a>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown("")
+
+    if st.button("⬅️ Volver al listado", type="primary"):
+        st.session_state["producto_seleccionado"] = None
+        st.experimental_rerun()
+
+# --- Si NO hay producto seleccionado, mostrar el grid (catálogo) ---
 else:
-    cols = st.columns(3)
-    for i, (_, row) in enumerate(filtro.iterrows()):
-        with cols[i % 3]:
-            # --- Card principal con foto y botón WhatsApp ---
-            mensaje = f"Hola! Quiero consultar por el producto: {row['nombre']}"
-            link_wsp = f"https://wa.me/{nro_wsp}?text={mensaje.replace(' ', '%20')}"
-            st.markdown(
-                f"""
-                <div style='background:#fff; border-radius:18px; box-shadow:0 2px 8px #eee; margin-bottom:18px; overflow:hidden;'>
-                    <img src="{row['foto_principal']}" style='width:100%; aspect-ratio:1.3; object-fit:cover; border-radius:16px 16px 0 0;' alt='foto producto'/>
-                    <div style='padding:14px 12px 8px 12px;'>
-                        <span style='font-size:1.1em; font-weight:bold; color:#64451d;'>{row["nombre"]}</span><br>
-                        <span style='font-size:0.95em; color:#977a51;'>{row["categoria"]} – {row["subcategoria"]}</span><br>
-                        <span style='font-size:2em; color:#be8725; font-weight:bold;'>${row["precio"]:,.0f}</span><br>
-                        <span style='color:#444;'>{row["descripcion"]}</span><br>
-                        <a href="{link_wsp}" target="_blank" style="text-decoration:none;">
-                            <button style="background:#25d366; color:white; border:none; padding:7px 18px; border-radius:7px; margin-top:10px; font-size:1em; cursor:pointer;">
-                                📲 Consultar por WhatsApp
-                            </button>
-                        </a>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+    if filtro.empty:
+        st.warning("No hay productos que coincidan con tu búsqueda.")
+    else:
+        cols = st.columns(3)
+        for i, (_, row) in enumerate(filtro.iterrows()):
+            with cols[i % 3]:
+                mensaje = f"Hola! Quiero consultar por el producto: {row['nombre']}"
+                link_wsp = f"https://wa.me/{nro_wsp}?text={mensaje.replace(' ', '%20')}"
+                # El truco: cuando hace click en el nombre, se guarda el producto seleccionado en session_state
+                if st.button(f"👀 {row['nombre']}", key=f"vermas_{i}"):
+                    st.session_state["producto_seleccionado"] = row
+                    st.experimental_rerun()
+                st.image(row["foto_principal"], width=260)
+                st.markdown(
+                    f"""
+                    <span style='font-size:1em; color:#977a51;'>{row["categoria"]} – {row["subcategoria"]}</span><br>
+                    <span style='font-size:1.8em; color:#be8725; font-weight:bold;'>${row["precio"]:,.0f}</span><br>
+                    <span style='color:#444;'>{row["descripcion"]}</span><br>
+                    <a href="{link_wsp}" target="_blank" style="text-decoration:none;">
+                        <button style="background:#25d366; color:white; border:none; padding:7px 18px; border-radius:7px; margin-top:10px; font-size:1em; cursor:pointer;">
+                            📲 WhatsApp
+                        </button>
+                    </a>
+                    """,
+                    unsafe_allow_html=True
+                )
 
-            # --- Expander con más info, galería, maridaje y clientes ---
-            with st.expander(f"🔍 Ver más de {row['nombre']}"):
-                st.subheader("Galería de producto")
-                st.image(row["galeria"], width=200, caption=[f"{row['nombre']} {i+1}" for i in range(len(row["galeria"]))])
-                st.markdown("---")
-                st.subheader("Más información")
-                st.markdown(f"**Descripción:** {row['descripcion']}")
-                st.markdown(f"**Categoría:** {row['categoria']} – {row['subcategoria']}")
-                st.markdown(f"**Maridaje sugerido:** {row['maridaje']}")
-                st.markdown("---")
-                st.subheader("Fotos con clientes")
-                st.image(row["fotos_clientes"], width=70, caption=[f"Cliente {i+1}" for i in range(len(row["fotos_clientes"]))])
-
-st.caption("Mostrando productos premium. Para consultas o pedidos, tocá el botón WhatsApp en cada producto.")
-
+st.caption("Mostrando productos premium. Para consultas, tocá el botón WhatsApp en cada producto o en el detalle.")
