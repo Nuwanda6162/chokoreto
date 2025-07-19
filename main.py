@@ -1755,9 +1755,9 @@ if seccion == "Carteles para imprimir":
                     # Borde del cartel 7x7cm
                     c.rect(x, y, ancho_cartel, alto_cartel, stroke=1, fill=0)
                     # Línea de doblez horizontal (a los 3.5cm desde abajo)
-                    c.setDash(2, 2)
-                    c.line(x, y + alto_cartel/2, x + ancho_cartel, y + alto_cartel/2)
-                    c.setDash()  # línea sólida de nuevo
+#                    c.setDash(2, 2)
+#                    c.line(x, y + alto_cartel/2, x + ancho_cartel, y + alto_cartel/2)
+#                    c.setDash()  # línea sólida de nuevo
             
                     # Texto centrado SOLO en la mitad de abajo (7x3.5cm)
                     centro_x = x + ancho_cartel / 2
