@@ -7,6 +7,11 @@ import numpy as np
 #from dotenv import load_dotenv
 import os
 import psycopg2
+from reportlab.lib.pagesizes import A3
+from reportlab.pdfgen import canvas
+from reportlab.lib.units import mm
+import io
+
 
 #load_dotenv()  # Esto carga el .env
 APP_PASSWORD = os.getenv("APP_PASSWORD")
@@ -55,7 +60,8 @@ seccion = st.sidebar.radio("Ir a:", [
     "💵 Movimientos",
     "📉 Reportes",
     "🧪 Simulador de productos",
-    "🛠️ ABM (Gestión de Datos)"
+    "🛠️ ABM (Gestión de Datos)",
+    "🖨️ Carteles para imprimir"
 ])
 
 
@@ -1633,3 +1639,78 @@ elif seccion == "🧪 Simulador de productos":
     if st.button("Limpiar simulación"):
         st.session_state["simulador_ingredientes"] = []
         st.rerun()
+
+    
+# =========================
+# 🛠️ Imprimibles
+# =========================
+
+if opcion == "🖨️ Carteles para imprimir":
+    st.title("🖨️ Generar carteles de precios")
+    
+    # --- Traer productos y precios de la base ---
+    productos_df = pd.read_sql_query("SELECT nombre, precio_normalizado FROM productos ORDER BY nombre", conn)
+
+    # --- Multiselección de productos ---
+    seleccionados = st.multiselect(
+        "Seleccioná los productos que querés imprimir",
+        productos_df["nombre"].tolist(),
+        default=[]
+    )
+
+    # --- Armar tabla editable para los seleccionados ---
+    if seleccionados:
+        editable_df = productos_df[productos_df["nombre"].isin(seleccionados)].copy()
+        editable_df["Nuevo nombre"] = editable_df["nombre"]
+        editable_df["Nuevo precio"] = editable_df["precio_normalizado"]
+        edited = st.data_editor(
+            editable_df[["Nuevo nombre", "Nuevo precio"]],
+            num_rows="fixed",
+            use_container_width=True
+        )
+
+        # --- Previsualización simple ---
+        st.subheader("Previsualización")
+        for idx, row in edited.iterrows():
+            st.markdown(
+                f"""
+                <div style='font-size:30px; font-family:serif; margin-bottom:5px'>{row['Nuevo nombre']}</div>
+                <div style='font-size:26px; font-family:serif; font-weight:bold'>${int(row['Nuevo precio'])}</div>
+                <hr style='border:0.5px dashed #999; width:130px; margin:6px 0 20px 0'>
+                """, unsafe_allow_html=True
+            )
+
+        # --- Botón para generar PDF ---
+        if st.button("Generar PDF para imprimir"):
+            buffer = io.BytesIO()
+            c = canvas.Canvas(buffer, pagesize=A3)
+            ancho_hoja, alto_hoja = A3
+            ancho_cartel = 100 * mm  # 10 cm
+            alto_cartel = 50 * mm    # 5 cm
+            margen = 10 * mm
+
+            x, y = margen, alto_hoja - alto_cartel - margen
+            for idx, row in edited.iterrows():
+                c.rect(x, y, ancho_cartel, alto_cartel, stroke=1, fill=0)  # línea de corte
+                c.setFont("Times-Bold", 24)
+                c.drawCentredString(x + ancho_cartel/2, y + alto_cartel*0.65, str(row["Nuevo nombre"]))
+                c.setFont("Times-Roman", 22)
+                c.drawCentredString(x + ancho_cartel/2, y + alto_cartel*0.35, f"${int(row['Nuevo precio'])}")
+
+                # Siguiente cartel (en columnas y filas)
+                x += ancho_cartel + margen
+                if x + ancho_cartel + margen > ancho_hoja:
+                    x = margen
+                    y -= alto_cartel + margen
+                if y < margen:
+                    c.showPage()
+                    x, y = margen, alto_hoja - alto_cartel - margen
+
+            c.save()
+            buffer.seek(0)
+            st.download_button(
+                label="Descargar PDF",
+                data=buffer,
+                file_name="carteles_precios.pdf",
+                mime="application/pdf"
+            )
