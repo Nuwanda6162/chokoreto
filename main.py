@@ -1645,7 +1645,7 @@ elif seccion == "🧪 Simulador de productos":
 # 🛠️ Imprimibles
 # =========================
 
-if seccion == "Carteles para imprimir":
+elif seccion == "Carteles para imprimir":
     import io
 
     try:
@@ -1662,7 +1662,6 @@ if seccion == "Carteles para imprimir":
     if A3 is None:
         st.warning("Para usar esta función, primero instalá la librería reportlab (pip install reportlab)")
     else:
-        # ----- TABS -----
         tab1, tab2 = st.tabs(["Carteles chicos", "Cartel grande"])
         with tab1:
             productos_df = pd.read_sql_query("SELECT nombre, precio_normalizado FROM productos ORDER BY nombre", conn)
@@ -1714,17 +1713,15 @@ if seccion == "Carteles para imprimir":
                     use_container_width=True
                 )
 
-                # --- Parámetros de visualización ---
-                columnas = 5  # cantidad de carteles por fila (igual que en PDF)
-                ancho_px = 140  # ancho visual aprox. de 7 cm a escala
-                alto_px = 140   # alto visual aprox. de 7 cm a escala
-                
-                # --- Previsualización en grid ---
+                # --- Previsualización en grilla tipo A3 ---
+                columnas = 5  # igual que PDF
+                ancho_px = 140
+                alto_px = 140
                 st.subheader("Previsualización (rejilla A3)")
-                grid_rows = []
-                cartel_row = []
-                for idx, row_data in edited.iterrows():
-                    cartel_html = f"""
+
+                cartelitos_html = []
+                for idx, row in edited.iterrows():
+                    cartelitos_html.append(f"""
                         <div style='
                             width:{ancho_px}px;
                             height:{alto_px}px;
@@ -1733,38 +1730,24 @@ if seccion == "Carteles para imprimir":
                             margin:8px;
                             background: linear-gradient(to bottom, #fff 50%, #f9f9f9 50%);
                             display:flex;
-                            flex-direction:column;
-                        '>
+                            flex-direction:column;'>
                           <div style='height:50%;'></div>
-                          <div style='
-                              height:50%;
-                              display:flex;
-                              flex-direction:column;
-                              justify-content:center;
-                              align-items:center;
-                          '>
-                            <span style='font-size:16px; font-family:"Comic Sans MS",cursive,sans-serif; font-weight:600; line-height:1;'>{row_data['Nuevo nombre']}</span>
-                            <span style='font-size:13px; font-family:"Comic Sans MS",cursive,sans-serif; font-weight:700; margin-top:5px; line-height:1;'>{int(row_data['Nuevo precio'])}</span>
+                          <div style='height:50%;display:flex;flex-direction:column;justify-content:center;align-items:center;'>
+                            <span style='font-size:16px; font-family:"Comic Sans MS",cursive,sans-serif; font-weight:600; line-height:1;'>{row['Nuevo nombre']}</span>
+                            <span style='font-size:13px; font-family:"Comic Sans MS",cursive,sans-serif; font-weight:700; margin-top:5px; line-height:1;'>{int(row['Nuevo precio'])}</span>
                           </div>
                         </div>
-                    """
-                    cartel_row.append(cartel_html)
-                    if len(cartel_row) == columnas:
-                        grid_rows.append(cartel_row)
-                        cartel_row = []
-                if cartel_row:
-                    grid_rows.append(cartel_row)
-                
-                for fila in grid_rows:
+                    """)
+
+                # Mostramos la grilla real, usando solo st.markdown y chunks de 5 por fila
+                for i in range(0, len(cartelitos_html), columnas):
+                    fila_html = "".join(cartelitos_html[i:i+columnas])
                     st.markdown(
-                        "<div style='display:flex;flex-direction:row;justify-content:left;'>" + "".join(fila) + "</div>",
+                        f"<div style='display:flex;flex-direction:row;justify-content:left;'>{fila_html}</div>",
                         unsafe_allow_html=True
                     )
 
-
-
                 # --- Fuente personalizada para ReportLab ---
-                # Subí el archivo TTF de la fuente que quieras (ej: "DancingScript-Regular.ttf") a tu proyecto y poné el nombre acá:
                 fuente_ttf = "DancingScript-Regular.ttf"
                 try:
                     pdfmetrics.registerFont(TTFont("Manuscrita", fuente_ttf))
@@ -1772,40 +1755,31 @@ if seccion == "Carteles para imprimir":
                 except:
                     fuente = "Times-Roman"  # fallback
 
-            if st.button("Generar PDF para imprimir", key="pdf_chicos"):
+            if st.session_state.carteles_chicos_seleccionados and st.button("Generar PDF para imprimir", key="pdf_chicos"):
                 buffer = io.BytesIO()
                 c = canvas.Canvas(buffer, pagesize=A3)
                 ancho_hoja, alto_hoja = A3
                 ancho_cartel = 70 * mm  # 7 cm
                 alto_cartel = 70 * mm   # 7 cm
                 margen = 10 * mm
-            
-                # --- Fuente personalizada (opcional) ---
+
                 fuente_ttf = "DancingScript-Regular.ttf"
                 try:
                     pdfmetrics.registerFont(TTFont("Manuscrita", fuente_ttf))
                     fuente = "Manuscrita"
                 except:
                     fuente = "Times-Roman"  # fallback
-            
+
                 x, y = margen, alto_hoja - alto_cartel - margen
                 for idx, row in edited.iterrows():
-                    # Borde del cartel 7x7cm
                     c.rect(x, y, ancho_cartel, alto_cartel, stroke=1, fill=0)
-                    # Línea de doblez horizontal (a los 3.5cm desde abajo)
-#                    c.setDash(2, 2)
-#                    c.line(x, y + alto_cartel/2, x + ancho_cartel, y + alto_cartel/2)
-#                    c.setDash()  # línea sólida de nuevo
-            
-                    # Texto centrado SOLO en la mitad de abajo (7x3.5cm)
                     centro_x = x + ancho_cartel / 2
-                    centro_y = y + alto_cartel / 4  # la mitad inferior, centro vertical
+                    centro_y = y + alto_cartel / 4
                     c.setFont(fuente, 18)
                     c.drawCentredString(centro_x, centro_y + 10, str(row["Nuevo nombre"]))
                     c.setFont(fuente, 16)
                     c.drawCentredString(centro_x, centro_y - 10, str(int(row['Nuevo precio'])))
-            
-                    # Siguiente cartel (columnas y filas)
+
                     x += ancho_cartel + margen
                     if x + ancho_cartel + margen > ancho_hoja:
                         x = margen
@@ -1813,7 +1787,7 @@ if seccion == "Carteles para imprimir":
                     if y < margen:
                         c.showPage()
                         x, y = margen, alto_hoja - alto_cartel - margen
-            
+
                 c.save()
                 buffer.seek(0)
                 st.download_button(
@@ -1822,7 +1796,6 @@ if seccion == "Carteles para imprimir":
                     file_name="carteles_chicos.pdf",
                     mime="application/pdf"
                 )
-        # --- En tab2 va la lógica del cartel grande (ver más adelante) ---
+
         with tab2:
             st.info("Pronto podés armar el cartel grande (Caja de Bombones y más). ¡Lo seguimos en el próximo paso!")
-
