@@ -1869,30 +1869,30 @@ elif seccion == "Carteles para imprimir":
             for i in range(len(st.session_state.cartel_grande_tabla)):
                 desc = st.session_state.cartel_grande_tabla.iloc[i]['Descripción']
                 precio = st.session_state.cartel_grande_tabla.iloc[i]['Precio']
-                col1, col2 = st.columns([0.08, 0.08, 0.08, 0.76])  # Achicamos muchísimo los espacios de botones
-            
-                with col1:
+                cols = st.columns([0.07, 0.07, 0.07, 0.79])  # Compacto
+                with cols[0]:
                     if st.button("🔼", key=f"subir_{i}_grande") and i > 0:
                         df = st.session_state.cartel_grande_tabla.copy()
                         df.iloc[[i-1, i]] = df.iloc[[i, i-1]].values
                         st.session_state.cartel_grande_tabla = df.reset_index(drop=True)
                         st.rerun()
-                with col2:
+                with cols[1]:
                     if st.button("🔽", key=f"bajar_{i}_grande") and i < len(st.session_state.cartel_grande_tabla)-1:
                         df = st.session_state.cartel_grande_tabla.copy()
                         df.iloc[[i, i+1]] = df.iloc[[i+1, i]].values
                         st.session_state.cartel_grande_tabla = df.reset_index(drop=True)
                         st.rerun()
-                with st.columns([0.08, 0.92])[0]:
+                with cols[2]:
                     if st.button("🗑️", key=f"eliminar_{i}_grande"):
                         df = st.session_state.cartel_grande_tabla.drop(i).reset_index(drop=True)
                         st.session_state.cartel_grande_tabla = df
                         st.rerun()
-                with st.columns([0.76, 0.24])[0]:
+                with cols[3]:
                     st.markdown(
-                        f"<div style='display:flex;align-items:center;height:32px;font-size:19px;'>{desc} — {precio}</div>",
+                        f"<div style='display:flex;align-items:center;height:28px; font-size:18px; padding-left:4px;'>{desc} — {precio}</div>",
                         unsafe_allow_html=True
                     )
+
 
 
         
