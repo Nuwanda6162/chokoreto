@@ -1661,7 +1661,14 @@ if seccion == "Carteles para imprimir":
         st.warning("Para usar esta función, primero instalá la librería reportlab (pip install reportlab)")
     else:
         productos_df = pd.read_sql_query("SELECT nombre, precio_normalizado FROM productos ORDER BY nombre", conn)
-    
+        
+        busqueda = st.text_input("Buscar producto")
+        
+        if busqueda:
+            filtrados = productos_df[productos_df["nombre"].str.contains(busqueda, case=False, na=False)]
+        else:
+            filtrados = productos_df
+        
         seleccionados = st.multiselect(
             "Seleccioná los productos que querés imprimir",
             productos_df["nombre"].tolist(),
