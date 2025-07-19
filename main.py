@@ -1736,8 +1736,8 @@ if seccion == "Carteles para imprimir":
                               justify-content:center;
                               align-items:center;
                           '>
-                            <span style='font-size:24px; font-family:"Comic Sans MS",cursive,sans-serif; font-weight:600; line-height:1;'>{row['Nuevo nombre']}</span>
-                            <span style='font-size:22px; font-family:"Comic Sans MS",cursive,sans-serif; font-weight:700; margin-top:8px; line-height:1;'>{int(row['Nuevo precio'])}</span>
+                            <span style='font-size:10px; font-family:"Comic Sans MS",cursive,sans-serif; font-weight:600; line-height:1;'>{row['Nuevo nombre']}</span>
+                            <span style='font-size:10px; font-family:"Comic Sans MS",cursive,sans-serif; font-weight:700; margin-top:8px; line-height:1;'>{int(row['Nuevo precio'])}</span>
                           </div>
                         </div>
                         """, unsafe_allow_html=True
