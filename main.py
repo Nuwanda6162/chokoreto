@@ -1784,7 +1784,7 @@ elif seccion == "Carteles para imprimir":
                         x, y = margen, alto_hoja - alto_cartel - margen
                         count = 0  # ¡Reinicia el contador!
                         
-                    c.rect(x, y, ancho_cartel, alto_cartel, stroke=1, fill=0)
+#                    c.rect(x, y, ancho_cartel, alto_cartel, stroke=1, fill=0)
                     centro_x = x + ancho_cartel / 2
                     centro_y = y + alto_cartel / 4
 
