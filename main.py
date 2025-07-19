@@ -1645,7 +1645,7 @@ elif seccion == "🧪 Simulador de productos":
 # 🛠️ Imprimibles
 # =========================
 
-elif opcion == "Carteles para imprimir":
+if seccion == "Carteles para imprimir":
     import io
     
     try:
