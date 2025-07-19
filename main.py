@@ -1766,19 +1766,35 @@ elif seccion == "Carteles para imprimir":
                 x, y = margen, alto_hoja - alto_cartel - margen
                 count = 0
                 for idx, row in edited.iterrows():
+                    # --- Salto de página si no hay espacio para una fila más ---
+                    if y < margen:
+                        c.showPage()
+                        x, y = margen, alto_hoja - alto_cartel - margen
+                        count = 0
+                
                     c.rect(x, y, ancho_cartel, alto_cartel, stroke=1, fill=0)
                     centro_x = x + ancho_cartel / 2
                     centro_y = y + alto_cartel / 4
-                    c.setFont(fuente, 18)
-                    c.drawCentredString(centro_x, centro_y + 10, str(row["Nuevo nombre"]))
+                
+                    # --- WRAP y centrado en dos líneas ---
+                    lineas = wrap_centrado(str(row["Nuevo nombre"]), maxlen=18)
+                    if len(lineas) == 1:
+                        c.setFont(fuente, 18)
+                        c.drawCentredString(centro_x, centro_y + 10, lineas[0])
+                    else:
+                        c.setFont(fuente, 15)
+                        c.drawCentredString(centro_x, centro_y + 18, lineas[0])
+                        c.drawCentredString(centro_x, centro_y - 2, lineas[1])
                     c.setFont(fuente, 16)
-                    c.drawCentredString(centro_x, centro_y - 10, str(int(row['Nuevo precio'])))
+                    c.drawCentredString(centro_x, centro_y - 18, str(int(row['Nuevo precio'])))
+                
                     count += 1
                     if count % carteles_por_fila == 0:
                         x = margen
                         y -= alto_cartel + margen
                     else:
                         x += ancho_cartel + margen
+
                     if y < margen:
                         c.showPage()
                         x, y = margen, alto_hoja - alto_cartel - margen
