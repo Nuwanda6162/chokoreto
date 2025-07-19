@@ -1647,42 +1647,65 @@ elif seccion == "🧪 Simulador de productos":
 
 if seccion == "Carteles para imprimir":
     import io
-    
+
     try:
         from reportlab.lib.pagesizes import A3
         from reportlab.pdfgen import canvas
         from reportlab.lib.units import mm
     except ImportError:
         A3 = canvas = mm = None
-    
+
     st.title("🖨️ Generar carteles de precios")
-    
+
     if A3 is None:
         st.warning("Para usar esta función, primero instalá la librería reportlab (pip install reportlab)")
     else:
         productos_df = pd.read_sql_query("SELECT nombre, precio_normalizado FROM productos ORDER BY nombre", conn)
-        
+
+        # --- Buscador por nombre ---
         busqueda = st.text_input("Buscar producto")
-        
+
         if busqueda:
             filtrados = productos_df[productos_df["nombre"].str.contains(busqueda, case=False, na=False)]
         else:
             filtrados = productos_df
 
+        # --- Session state para acumulación de selección ---
+        if "carteles_seleccionados" not in st.session_state:
+            st.session_state.carteles_seleccionados = []
+
+        # --- Multi-select, suma a los acumulados ---
         seleccionados = st.multiselect(
-            "Seleccioná los productos que querés imprimir",
+            "Seleccioná los productos que querés agregar a la selección",
             filtrados["nombre"].tolist(),
             default=[]
         )
-        
-#        seleccionados = st.multiselect(
-#            "Seleccioná los productos que querés imprimir",
-#            productos_df["nombre"].tolist(),
-#            default=[]
-#        )
-    
-        if seleccionados:
-            editable_df = productos_df[productos_df["nombre"].isin(seleccionados)].copy()
+
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            if st.button("Agregar a la selección"):
+                nuevos = [prod for prod in seleccionados if prod not in st.session_state.carteles_seleccionados]
+                st.session_state.carteles_seleccionados += nuevos
+
+        with col2:
+            if st.button("Limpiar selección"):
+                st.session_state.carteles_seleccionados = []
+
+        # --- Mostrar selección acumulada y opción de eliminar de a uno ---
+        if st.session_state.carteles_seleccionados:
+            st.write("Seleccionados para imprimir:")
+            for prod in st.session_state.carteles_seleccionados:
+                colx1, colx2 = st.columns([3, 1])
+                with colx1:
+                    st.markdown(f"- **{prod}**")
+                with colx2:
+                    if st.button(f"Quitar '{prod}'", key=f"quitar_{prod}"):
+                        st.session_state.carteles_seleccionados.remove(prod)
+                        st.experimental_rerun()
+
+        # --- Edición y generación de carteles ---
+        if st.session_state.carteles_seleccionados:
+            editable_df = productos_df[productos_df["nombre"].isin(st.session_state.carteles_seleccionados)].copy()
             editable_df["Nuevo nombre"] = editable_df["nombre"]
             editable_df["Nuevo precio"] = editable_df["precio_normalizado"]
             edited = st.data_editor(
@@ -1690,7 +1713,7 @@ if seccion == "Carteles para imprimir":
                 num_rows="fixed",
                 use_container_width=True
             )
-    
+
             st.subheader("Previsualización")
             for idx, row in edited.iterrows():
                 st.markdown(
@@ -1700,7 +1723,7 @@ if seccion == "Carteles para imprimir":
                     <hr style='border:0.5px dashed #999; width:130px; margin:6px 0 20px 0'>
                     """, unsafe_allow_html=True
                 )
-    
+
             if st.button("Generar PDF para imprimir"):
                 buffer = io.BytesIO()
                 c = canvas.Canvas(buffer, pagesize=A3)
@@ -1708,7 +1731,7 @@ if seccion == "Carteles para imprimir":
                 ancho_cartel = 100 * mm  # 10 cm
                 alto_cartel = 50 * mm    # 5 cm
                 margen = 10 * mm
-    
+
                 x, y = margen, alto_hoja - alto_cartel - margen
                 for idx, row in edited.iterrows():
                     c.rect(x, y, ancho_cartel, alto_cartel, stroke=1, fill=0)  # línea de corte
@@ -1716,7 +1739,7 @@ if seccion == "Carteles para imprimir":
                     c.drawCentredString(x + ancho_cartel/2, y + alto_cartel*0.65, str(row["Nuevo nombre"]))
                     c.setFont("Times-Roman", 22)
                     c.drawCentredString(x + ancho_cartel/2, y + alto_cartel*0.35, f"${int(row['Nuevo precio'])}")
-    
+
                     # Siguiente cartel (en columnas y filas)
                     x += ancho_cartel + margen
                     if x + ancho_cartel + margen > ancho_hoja:
@@ -1725,7 +1748,7 @@ if seccion == "Carteles para imprimir":
                     if y < margen:
                         c.showPage()
                         x, y = margen, alto_hoja - alto_cartel - margen
-    
+
                 c.save()
                 buffer.seek(0)
                 st.download_button(
