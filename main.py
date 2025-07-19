@@ -1718,12 +1718,31 @@ if seccion == "Carteles para imprimir":
                 for idx, row in edited.iterrows():
                     st.markdown(
                         f"""
-                        <div style='width:200px;height:70px;border:1px dashed #bbb;display:flex;flex-direction:column;justify-content:center;align-items:center;margin-bottom:10px'>
-                            <div style='font-size:28px;font-family:"Comic Sans MS",cursive,sans-serif;margin-bottom:2px;text-align:center'>{row['Nuevo nombre']}</div>
-                            <div style='font-size:24px;font-family:"Comic Sans MS",cursive,sans-serif;font-weight:bold;text-align:center'>{int(row['Nuevo precio'])}</div>
+                        <div style='
+                            width:140px;
+                            height:140px;
+                            border:1px solid #bbb;
+                            border-radius:8px;
+                            margin-bottom:16px;
+                            background: linear-gradient(to bottom, #fff 50%, #f9f9f9 50%);
+                            display:flex;
+                            flex-direction:column;
+                            '>
+                          <div style='height:50%;'></div>
+                          <div style='
+                              height:50%;
+                              display:flex;
+                              flex-direction:column;
+                              justify-content:center;
+                              align-items:center;
+                          '>
+                            <span style='font-size:24px; font-family:"Comic Sans MS",cursive,sans-serif; font-weight:600; line-height:1;'>{row['Nuevo nombre']}</span>
+                            <span style='font-size:22px; font-family:"Comic Sans MS",cursive,sans-serif; font-weight:700; margin-top:8px; line-height:1;'>{int(row['Nuevo precio'])}</span>
+                          </div>
                         </div>
                         """, unsafe_allow_html=True
                     )
+
 
                 # --- Fuente personalizada para ReportLab ---
                 # Subí el archivo TTF de la fuente que quieras (ej: "DancingScript-Regular.ttf") a tu proyecto y poné el nombre acá:
