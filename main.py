@@ -1645,21 +1645,29 @@ elif seccion == "🧪 Simulador de productos":
 # 🛠️ Imprimibles
 # =========================
 
-if opcion == "Carteles para imprimir":
+elif opcion == "Carteles para imprimir":
+    import io
+    
+    try:
+        from reportlab.lib.pagesizes import A3
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.units import mm
+    except ImportError:
+        A3 = canvas = mm = None
+    
     st.title("🖨️ Generar carteles de precios")
-
+    
     if A3 is None:
         st.warning("Para usar esta función, primero instalá la librería reportlab (pip install reportlab)")
     else:
-        # Adaptá tu conexión según tu app (acá asumo conn es tu conexión activa)
         productos_df = pd.read_sql_query("SELECT nombre, precio_normalizado FROM productos ORDER BY nombre", conn)
-
+    
         seleccionados = st.multiselect(
             "Seleccioná los productos que querés imprimir",
             productos_df["nombre"].tolist(),
             default=[]
         )
-
+    
         if seleccionados:
             editable_df = productos_df[productos_df["nombre"].isin(seleccionados)].copy()
             editable_df["Nuevo nombre"] = editable_df["nombre"]
@@ -1669,7 +1677,7 @@ if opcion == "Carteles para imprimir":
                 num_rows="fixed",
                 use_container_width=True
             )
-
+    
             st.subheader("Previsualización")
             for idx, row in edited.iterrows():
                 st.markdown(
@@ -1679,7 +1687,7 @@ if opcion == "Carteles para imprimir":
                     <hr style='border:0.5px dashed #999; width:130px; margin:6px 0 20px 0'>
                     """, unsafe_allow_html=True
                 )
-
+    
             if st.button("Generar PDF para imprimir"):
                 buffer = io.BytesIO()
                 c = canvas.Canvas(buffer, pagesize=A3)
@@ -1687,7 +1695,7 @@ if opcion == "Carteles para imprimir":
                 ancho_cartel = 100 * mm  # 10 cm
                 alto_cartel = 50 * mm    # 5 cm
                 margen = 10 * mm
-
+    
                 x, y = margen, alto_hoja - alto_cartel - margen
                 for idx, row in edited.iterrows():
                     c.rect(x, y, ancho_cartel, alto_cartel, stroke=1, fill=0)  # línea de corte
@@ -1695,7 +1703,7 @@ if opcion == "Carteles para imprimir":
                     c.drawCentredString(x + ancho_cartel/2, y + alto_cartel*0.65, str(row["Nuevo nombre"]))
                     c.setFont("Times-Roman", 22)
                     c.drawCentredString(x + ancho_cartel/2, y + alto_cartel*0.35, f"${int(row['Nuevo precio'])}")
-
+    
                     # Siguiente cartel (en columnas y filas)
                     x += ancho_cartel + margen
                     if x + ancho_cartel + margen > ancho_hoja:
@@ -1704,7 +1712,7 @@ if opcion == "Carteles para imprimir":
                     if y < margen:
                         c.showPage()
                         x, y = margen, alto_hoja - alto_cartel - margen
-
+    
                 c.save()
                 buffer.seek(0)
                 st.download_button(
