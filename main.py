@@ -1734,47 +1734,56 @@ if seccion == "Carteles para imprimir":
                 except:
                     fuente = "Times-Roman"  # fallback
 
-                if st.button("Generar PDF para imprimir", key="pdf_chicos"):
-                    buffer = io.BytesIO()
-                    c = canvas.Canvas(buffer, pagesize=A3)
-                    ancho_hoja, alto_hoja = A3
-                    ancho_cartel = 70 * mm  # 7 cm
-                    alto_cartel = 70 * mm   # 7 cm
-                    margen = 10 * mm
-
-                    x, y = margen, alto_hoja - alto_cartel - margen
-                    for idx, row in edited.iterrows():
-                        c.rect(x, y, ancho_cartel, alto_cartel, stroke=1, fill=0)  # borde del cartel
-
-                        # Línea de doblez
-                        c.setDash(2, 2)
-                        c.line(x + ancho_cartel/2, y, x + ancho_cartel/2, y + alto_cartel)
-                        c.setDash()  # vuelve a línea sólida
-
-                        # Texto en el lado derecho (centrado en 3.5x7 cm)
-                        c.setFont(fuente, 18)
-                        c.drawCentredString(x + (3.5 * mm * 5), y + alto_cartel*0.60, str(row["Nuevo nombre"]))
-                        c.setFont(fuente, 16)
-                        c.drawCentredString(x + (3.5 * mm * 5), y + alto_cartel*0.35, str(int(row['Nuevo precio'])))
-
-                        # Siguiente cartel (en columnas y filas)
-                        x += ancho_cartel + margen
-                        if x + ancho_cartel + margen > ancho_hoja:
-                            x = margen
-                            y -= alto_cartel + margen
-                        if y < margen:
-                            c.showPage()
-                            x, y = margen, alto_hoja - alto_cartel - margen
-
-                    c.save()
-                    buffer.seek(0)
-                    st.download_button(
-                        label="Descargar PDF",
-                        data=buffer,
-                        file_name="carteles_chicos.pdf",
-                        mime="application/pdf"
-                    )
-
+            if st.button("Generar PDF para imprimir", key="pdf_chicos"):
+                buffer = io.BytesIO()
+                c = canvas.Canvas(buffer, pagesize=A3)
+                ancho_hoja, alto_hoja = A3
+                ancho_cartel = 70 * mm  # 7 cm
+                alto_cartel = 70 * mm   # 7 cm
+                margen = 10 * mm
+            
+                # --- Fuente personalizada (opcional) ---
+                fuente_ttf = "DancingScript-Regular.ttf"
+                try:
+                    pdfmetrics.registerFont(TTFont("Manuscrita", fuente_ttf))
+                    fuente = "Manuscrita"
+                except:
+                    fuente = "Times-Roman"  # fallback
+            
+                x, y = margen, alto_hoja - alto_cartel - margen
+                for idx, row in edited.iterrows():
+                    # Borde del cartel 7x7cm
+                    c.rect(x, y, ancho_cartel, alto_cartel, stroke=1, fill=0)
+                    # Línea de doblez horizontal (a los 3.5cm desde abajo)
+                    c.setDash(2, 2)
+                    c.line(x, y + alto_cartel/2, x + ancho_cartel, y + alto_cartel/2)
+                    c.setDash()  # línea sólida de nuevo
+            
+                    # Texto centrado SOLO en la mitad de abajo (7x3.5cm)
+                    centro_x = x + ancho_cartel / 2
+                    centro_y = y + alto_cartel / 4  # la mitad inferior, centro vertical
+                    c.setFont(fuente, 18)
+                    c.drawCentredString(centro_x, centro_y + 10, str(row["Nuevo nombre"]))
+                    c.setFont(fuente, 16)
+                    c.drawCentredString(centro_x, centro_y - 10, str(int(row['Nuevo precio'])))
+            
+                    # Siguiente cartel (columnas y filas)
+                    x += ancho_cartel + margen
+                    if x + ancho_cartel + margen > ancho_hoja:
+                        x = margen
+                        y -= alto_cartel + margen
+                    if y < margen:
+                        c.showPage()
+                        x, y = margen, alto_hoja - alto_cartel - margen
+            
+                c.save()
+                buffer.seek(0)
+                st.download_button(
+                    label="Descargar PDF",
+                    data=buffer,
+                    file_name="carteles_chicos.pdf",
+                    mime="application/pdf"
+                )
         # --- En tab2 va la lógica del cartel grande (ver más adelante) ---
         with tab2:
             st.info("Pronto podés armar el cartel grande (Caja de Bombones y más). ¡Lo seguimos en el próximo paso!")
