@@ -1668,12 +1668,18 @@ if seccion == "Carteles para imprimir":
             filtrados = productos_df[productos_df["nombre"].str.contains(busqueda, case=False, na=False)]
         else:
             filtrados = productos_df
-        
+
         seleccionados = st.multiselect(
             "Seleccioná los productos que querés imprimir",
-            productos_df["nombre"].tolist(),
+            filtrados["nombre"].tolist(),
             default=[]
         )
+        
+#        seleccionados = st.multiselect(
+#            "Seleccioná los productos que querés imprimir",
+#            productos_df["nombre"].tolist(),
+#            default=[]
+#        )
     
         if seleccionados:
             editable_df = productos_df[productos_df["nombre"].isin(seleccionados)].copy()
