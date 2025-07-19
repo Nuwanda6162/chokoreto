@@ -1750,6 +1750,7 @@ elif seccion == "Carteles para imprimir":
             if st.session_state.carteles_chicos_seleccionados and st.button("Generar PDF para imprimir", key="pdf_chicos"):
                 buffer = io.BytesIO()
                 c = canvas.Canvas(buffer, pagesize=A3)
+
                 ancho_hoja, alto_hoja = A3
                 ancho_cartel = 70 * mm  # 7 cm
                 alto_cartel = 70 * mm   # 7 cm
