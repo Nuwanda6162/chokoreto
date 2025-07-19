@@ -1721,8 +1721,8 @@ if seccion == "Carteles para imprimir":
                 
                 # --- Previsualización en grid ---
                 st.subheader("Previsualización (rejilla A3)")
-                rows = []
-                row = []
+                grid_rows = []
+                cartel_row = []
                 for idx, row_data in edited.iterrows():
                     cartel_html = f"""
                         <div style='
@@ -1748,16 +1748,16 @@ if seccion == "Carteles para imprimir":
                           </div>
                         </div>
                     """
-                    row.append(cartel_html)
-                    if len(row) == columnas:
-                        rows.append(row)
-                        row = []
-                if row:
-                    rows.append(row)
+                    cartel_row.append(cartel_html)
+                    if len(cartel_row) == columnas:
+                        grid_rows.append(cartel_row)
+                        cartel_row = []
+                if cartel_row:
+                    grid_rows.append(cartel_row)
                 
-                for r in rows:
+                for fila in grid_rows:
                     st.markdown(
-                        "<div style='display:flex;flex-direction:row;justify-content:left;'>" + "".join(r) + "</div>",
+                        "<div style='display:flex;flex-direction:row;justify-content:left;'>" + "".join(fila) + "</div>",
                         unsafe_allow_html=True
                     )
 
