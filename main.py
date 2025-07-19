@@ -926,7 +926,7 @@ elif seccion == "💵 Movimientos":
                 col1, col2, col3 = st.columns([1, 1, 1])
                 with col1:
                     cantidad = st.number_input(
-                        "Cantidad", min_value=1, value=1, step=1, key="cant_venta"
+                        "Cantidad", min_value=1,  value=st.session_state.get("cant_venta", 1), step=1, key="cant_venta"
                     )
                 with col2:
                     tipo_pago_default = st.session_state.get("tipo_pago", "Efectivo")
