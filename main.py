@@ -884,6 +884,7 @@ elif seccion == "💵 Movimientos":
         if st.session_state.get("venta_recien_registrada", False):
             st.session_state["desc_libre"] = ""
             st.session_state["venta_recien_registrada"] = False
+            st.session_state["cant_venta"] = 1
     
         # Traer productos y buscador
         productos_full = pd.read_sql_query("""
