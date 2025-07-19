@@ -1897,6 +1897,12 @@ elif seccion == "Carteles para imprimir":
 
         
             # Previsualización
+            st.markdown(
+                """
+                <link href="https://fonts.googleapis.com/css2?family=Monsieur+La+Doulaise&display=swap" rel="stylesheet">
+                """,
+                unsafe_allow_html=True
+            )
             df_final = st.session_state.cartel_grande_tabla
             st.subheader("Previsualización")
             st.markdown(f"""
@@ -1913,7 +1919,7 @@ elif seccion == "Carteles para imprimir":
                 buffer = io.BytesIO()
                 from reportlab.lib.pagesizes import A5
                 c = canvas.Canvas(buffer, pagesize=A5)
-                fuente_ttf = "DancingScript-Regular.ttf"
+                fuente_ttf = "MonsieurLaDoulaise-Regular.ttf"
                 try:
                     pdfmetrics.registerFont(TTFont("Manuscrita", fuente_ttf))
                     fuente_titulo = "Manuscrita"
