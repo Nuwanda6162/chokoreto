@@ -1867,23 +1867,31 @@ elif seccion == "Carteles para imprimir":
             # Botones para mover filas
             st.write("Mover filas (arriba/abajo):")
             for i in range(len(st.session_state.cartel_grande_tabla)):
-                cols = st.columns([1, 1, 7])
+                cols = st.columns([0.18, 0.18, 0.64])
                 with cols[0]:
+                    st.markdown("<div style='display:flex;justify-content:center;align-items:center;height:32px;'>", unsafe_allow_html=True)
                     if st.button("🔼", key=f"subir_{i}_grande") and i > 0:
                         df = st.session_state.cartel_grande_tabla.copy()
                         df.iloc[[i-1, i]] = df.iloc[[i, i-1]].values
                         st.session_state.cartel_grande_tabla = df.reset_index(drop=True)
                         st.rerun()
+                    st.markdown("</div>", unsafe_allow_html=True)
                 with cols[1]:
+                    st.markdown("<div style='display:flex;justify-content:center;align-items:center;height:32px;'>", unsafe_allow_html=True)
                     if st.button("🔽", key=f"bajar_{i}_grande") and i < len(st.session_state.cartel_grande_tabla)-1:
                         df = st.session_state.cartel_grande_tabla.copy()
                         df.iloc[[i, i+1]] = df.iloc[[i+1, i]].values
                         st.session_state.cartel_grande_tabla = df.reset_index(drop=True)
                         st.rerun()
+                    st.markdown("</div>", unsafe_allow_html=True)
                 with cols[2]:
                     desc = st.session_state.cartel_grande_tabla.iloc[i]['Descripción']
                     precio = st.session_state.cartel_grande_tabla.iloc[i]['Precio']
-                    st.write(f"{desc} — {precio}")
+                    st.markdown(
+                        f"<div style='display:flex;align-items:center;height:32px; font-size:19px;'><span>{desc} — {precio}</span></div>",
+                        unsafe_allow_html=True
+                    )
+
         
             # Previsualización
             df_final = st.session_state.cartel_grande_tabla
