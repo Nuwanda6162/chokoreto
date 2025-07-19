@@ -1658,7 +1658,8 @@ elif seccion == "Carteles para imprimir":
         A3 = canvas = mm = pdfmetrics = TTFont = None
 
     st.title("🖨️ Generar carteles de precios")
-
+    carteles_por_fila = 5
+    
     if A3 is None:
         st.warning("Para usar esta función, primero instalá la librería reportlab (pip install reportlab)")
     else:
@@ -1714,7 +1715,7 @@ elif seccion == "Carteles para imprimir":
                 )
 
                 # --- Previsualización en grilla tipo A3 ---
-                columnas = 5  # igual que PDF
+                columnas = carteles_por_fila
                 ancho_px = 140
                 alto_px = 140
                 st.subheader("Previsualización (rejilla A3)")
@@ -1752,7 +1753,7 @@ elif seccion == "Carteles para imprimir":
                 ancho_hoja, alto_hoja = A3
                 ancho_cartel = 70 * mm  # 7 cm
                 alto_cartel = 70 * mm   # 7 cm
-                margen = 10 * mm
+                margen = (ancho_hoja - (carteles_por_fila * ancho_cartel)) / (carteles_por_fila + 1)  # margen real entre carteles
 
                 fuente_ttf = "DancingScript-Regular.ttf"
                 try:
@@ -1760,8 +1761,9 @@ elif seccion == "Carteles para imprimir":
                     fuente = "Manuscrita"
                 except:
                     fuente = "Times-Roman"  # fallback
-
+                
                 x, y = margen, alto_hoja - alto_cartel - margen
+                count = 0
                 for idx, row in edited.iterrows():
                     c.rect(x, y, ancho_cartel, alto_cartel, stroke=1, fill=0)
                     centro_x = x + ancho_cartel / 2
@@ -1770,11 +1772,12 @@ elif seccion == "Carteles para imprimir":
                     c.drawCentredString(centro_x, centro_y + 10, str(row["Nuevo nombre"]))
                     c.setFont(fuente, 16)
                     c.drawCentredString(centro_x, centro_y - 10, str(int(row['Nuevo precio'])))
-
-                    x += ancho_cartel + margen
-                    if x + ancho_cartel + margen > ancho_hoja:
+                    count += 1
+                    if count % carteles_por_fila == 0:
                         x = margen
                         y -= alto_cartel + margen
+                    else:
+                        x += ancho_cartel + margen
                     if y < margen:
                         c.showPage()
                         x, y = margen, alto_hoja - alto_cartel - margen
