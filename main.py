@@ -1652,108 +1652,130 @@ if seccion == "Carteles para imprimir":
         from reportlab.lib.pagesizes import A3
         from reportlab.pdfgen import canvas
         from reportlab.lib.units import mm
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
     except ImportError:
-        A3 = canvas = mm = None
+        A3 = canvas = mm = pdfmetrics = TTFont = None
 
     st.title("🖨️ Generar carteles de precios")
 
     if A3 is None:
         st.warning("Para usar esta función, primero instalá la librería reportlab (pip install reportlab)")
     else:
-        productos_df = pd.read_sql_query("SELECT nombre, precio_normalizado FROM productos ORDER BY nombre", conn)
+        # ----- TABS -----
+        tab1, tab2 = st.tabs(["Carteles chicos", "Cartel grande"])
+        with tab1:
+            productos_df = pd.read_sql_query("SELECT nombre, precio_normalizado FROM productos ORDER BY nombre", conn)
 
-        # --- Buscador por nombre ---
-        busqueda = st.text_input("Buscar producto")
+            busqueda = st.text_input("Buscar producto", key="busqueda_chicos")
+            if busqueda:
+                filtrados = productos_df[productos_df["nombre"].str.contains(busqueda, case=False, na=False)]
+            else:
+                filtrados = productos_df
 
-        if busqueda:
-            filtrados = productos_df[productos_df["nombre"].str.contains(busqueda, case=False, na=False)]
-        else:
-            filtrados = productos_df
+            # Session state para selección acumulativa
+            if "carteles_chicos_seleccionados" not in st.session_state:
+                st.session_state.carteles_chicos_seleccionados = []
 
-        # --- Session state para acumulación de selección ---
-        if "carteles_seleccionados" not in st.session_state:
-            st.session_state.carteles_seleccionados = []
-
-        # --- Multi-select, suma a los acumulados ---
-        seleccionados = st.multiselect(
-            "Seleccioná los productos que querés agregar a la selección",
-            filtrados["nombre"].tolist(),
-            default=[]
-        )
-
-        col1, col2 = st.columns([1, 1])
-        with col1:
-            if st.button("Agregar a la selección"):
-                nuevos = [prod for prod in seleccionados if prod not in st.session_state.carteles_seleccionados]
-                st.session_state.carteles_seleccionados += nuevos
-
-        with col2:
-            if st.button("Limpiar selección"):
-                st.session_state.carteles_seleccionados = []
-
-        # --- Mostrar selección acumulada y opción de eliminar de a uno ---
-        if st.session_state.carteles_seleccionados:
-            st.write("Seleccionados para imprimir:")
-            for prod in st.session_state.carteles_seleccionados:
-                colx1, colx2 = st.columns([3, 1])
-                with colx1:
-                    st.markdown(f"- **{prod}**")
-                with colx2:
-                    if st.button(f"Quitar '{prod}'", key=f"quitar_{prod}"):
-                        st.session_state.carteles_seleccionados.remove(prod)
-                        st.experimental_rerun()
-
-        # --- Edición y generación de carteles ---
-        if st.session_state.carteles_seleccionados:
-            editable_df = productos_df[productos_df["nombre"].isin(st.session_state.carteles_seleccionados)].copy()
-            editable_df["Nuevo nombre"] = editable_df["nombre"]
-            editable_df["Nuevo precio"] = editable_df["precio_normalizado"]
-            edited = st.data_editor(
-                editable_df[["Nuevo nombre", "Nuevo precio"]],
-                num_rows="fixed",
-                use_container_width=True
+            seleccionados = st.multiselect(
+                "Seleccioná los productos para los carteles chicos",
+                filtrados["nombre"].tolist(),
+                default=[],
+                key="carteles_chicos_multiselect"
             )
 
-            st.subheader("Previsualización")
-            for idx, row in edited.iterrows():
-                st.markdown(
-                    f"""
-                    <div style='font-size:30px; font-family:serif; margin-bottom:5px'>{row['Nuevo nombre']}</div>
-                    <div style='font-size:26px; font-family:serif; font-weight:bold'>${int(row['Nuevo precio'])}</div>
-                    <hr style='border:0.5px dashed #999; width:130px; margin:6px 0 20px 0'>
-                    """, unsafe_allow_html=True
+            col1, col2 = st.columns([1, 1])
+            with col1:
+                if st.button("Agregar a la selección", key="agregar_cartel_chico"):
+                    nuevos = [prod for prod in seleccionados if prod not in st.session_state.carteles_chicos_seleccionados]
+                    st.session_state.carteles_chicos_seleccionados += nuevos
+            with col2:
+                if st.button("Limpiar selección", key="limpiar_cartel_chico"):
+                    st.session_state.carteles_chicos_seleccionados = []
+
+            if st.session_state.carteles_chicos_seleccionados:
+                st.write("Seleccionados:")
+                for prod in st.session_state.carteles_chicos_seleccionados:
+                    colx1, colx2 = st.columns([3, 1])
+                    with colx1:
+                        st.markdown(f"- **{prod}**")
+                    with colx2:
+                        if st.button(f"Quitar '{prod}'", key=f"quitar_{prod}_chico"):
+                            st.session_state.carteles_chicos_seleccionados.remove(prod)
+                            st.experimental_rerun()
+
+            if st.session_state.carteles_chicos_seleccionados:
+                editable_df = productos_df[productos_df["nombre"].isin(st.session_state.carteles_chicos_seleccionados)].copy()
+                editable_df["Nuevo nombre"] = editable_df["nombre"]
+                editable_df["Nuevo precio"] = editable_df["precio_normalizado"]
+                edited = st.data_editor(
+                    editable_df[["Nuevo nombre", "Nuevo precio"]],
+                    num_rows="fixed",
+                    use_container_width=True
                 )
 
-            if st.button("Generar PDF para imprimir"):
-                buffer = io.BytesIO()
-                c = canvas.Canvas(buffer, pagesize=A3)
-                ancho_hoja, alto_hoja = A3
-                ancho_cartel = 100 * mm  # 10 cm
-                alto_cartel = 50 * mm    # 5 cm
-                margen = 10 * mm
-
-                x, y = margen, alto_hoja - alto_cartel - margen
+                st.subheader("Previsualización")
                 for idx, row in edited.iterrows():
-                    c.rect(x, y, ancho_cartel, alto_cartel, stroke=1, fill=0)  # línea de corte
-                    c.setFont("Times-Bold", 24)
-                    c.drawCentredString(x + ancho_cartel/2, y + alto_cartel*0.65, str(row["Nuevo nombre"]))
-                    c.setFont("Times-Roman", 22)
-                    c.drawCentredString(x + ancho_cartel/2, y + alto_cartel*0.35, f"${int(row['Nuevo precio'])}")
+                    st.markdown(
+                        f"""
+                        <div style='width:200px;height:70px;border:1px dashed #bbb;display:flex;flex-direction:column;justify-content:center;align-items:center;margin-bottom:10px'>
+                            <div style='font-size:28px;font-family:"Comic Sans MS",cursive,sans-serif;margin-bottom:2px;text-align:center'>{row['Nuevo nombre']}</div>
+                            <div style='font-size:24px;font-family:"Comic Sans MS",cursive,sans-serif;font-weight:bold;text-align:center'>{int(row['Nuevo precio'])}</div>
+                        </div>
+                        """, unsafe_allow_html=True
+                    )
 
-                    # Siguiente cartel (en columnas y filas)
-                    x += ancho_cartel + margen
-                    if x + ancho_cartel + margen > ancho_hoja:
-                        x = margen
-                        y -= alto_cartel + margen
-                    if y < margen:
-                        c.showPage()
-                        x, y = margen, alto_hoja - alto_cartel - margen
+                # --- Fuente personalizada para ReportLab ---
+                # Subí el archivo TTF de la fuente que quieras (ej: "DancingScript-Regular.ttf") a tu proyecto y poné el nombre acá:
+                fuente_ttf = "DancingScript-Regular.ttf"
+                try:
+                    pdfmetrics.registerFont(TTFont("Manuscrita", fuente_ttf))
+                    fuente = "Manuscrita"
+                except:
+                    fuente = "Times-Roman"  # fallback
 
-                c.save()
-                buffer.seek(0)
-                st.download_button(
-                    label="Descargar PDF",
-                    data=buffer,
-                    file_name="carteles_precios.pdf",
-                    mime="application/pdf"
-                )
+                if st.button("Generar PDF para imprimir", key="pdf_chicos"):
+                    buffer = io.BytesIO()
+                    c = canvas.Canvas(buffer, pagesize=A3)
+                    ancho_hoja, alto_hoja = A3
+                    ancho_cartel = 70 * mm  # 7 cm
+                    alto_cartel = 70 * mm   # 7 cm
+                    margen = 10 * mm
+
+                    x, y = margen, alto_hoja - alto_cartel - margen
+                    for idx, row in edited.iterrows():
+                        c.rect(x, y, ancho_cartel, alto_cartel, stroke=1, fill=0)  # borde del cartel
+
+                        # Línea de doblez
+                        c.setDash(2, 2)
+                        c.line(x + ancho_cartel/2, y, x + ancho_cartel/2, y + alto_cartel)
+                        c.setDash()  # vuelve a línea sólida
+
+                        # Texto en el lado derecho (centrado en 3.5x7 cm)
+                        c.setFont(fuente, 18)
+                        c.drawCentredString(x + (3.5 * mm * 5), y + alto_cartel*0.60, str(row["Nuevo nombre"]))
+                        c.setFont(fuente, 16)
+                        c.drawCentredString(x + (3.5 * mm * 5), y + alto_cartel*0.35, str(int(row['Nuevo precio'])))
+
+                        # Siguiente cartel (en columnas y filas)
+                        x += ancho_cartel + margen
+                        if x + ancho_cartel + margen > ancho_hoja:
+                            x = margen
+                            y -= alto_cartel + margen
+                        if y < margen:
+                            c.showPage()
+                            x, y = margen, alto_hoja - alto_cartel - margen
+
+                    c.save()
+                    buffer.seek(0)
+                    st.download_button(
+                        label="Descargar PDF",
+                        data=buffer,
+                        file_name="carteles_chicos.pdf",
+                        mime="application/pdf"
+                    )
+
+        # --- En tab2 va la lógica del cartel grande (ver más adelante) ---
+        with tab2:
+            st.info("Pronto podés armar el cartel grande (Caja de Bombones y más). ¡Lo seguimos en el próximo paso!")
+
