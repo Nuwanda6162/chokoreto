@@ -1865,32 +1865,35 @@ elif seccion == "Carteles para imprimir":
             st.session_state.cartel_grande_tabla = tabla.copy()
         
             # Botones para mover filas
-            st.write("Mover filas (arriba/abajo):")
+            st.write("Mover filas (arriba/abajo/eliminar):")
             for i in range(len(st.session_state.cartel_grande_tabla)):
-                cols = st.columns([0.18, 0.18, 0.64])
-                with cols[0]:
-                    st.markdown("<div style='display:flex;justify-content:center;align-items:center;height:32px;'>", unsafe_allow_html=True)
+                desc = st.session_state.cartel_grande_tabla.iloc[i]['Descripción']
+                precio = st.session_state.cartel_grande_tabla.iloc[i]['Precio']
+                col1, col2 = st.columns([0.08, 0.08, 0.08, 0.76])  # Achicamos muchísimo los espacios de botones
+            
+                with col1:
                     if st.button("🔼", key=f"subir_{i}_grande") and i > 0:
                         df = st.session_state.cartel_grande_tabla.copy()
                         df.iloc[[i-1, i]] = df.iloc[[i, i-1]].values
                         st.session_state.cartel_grande_tabla = df.reset_index(drop=True)
                         st.rerun()
-                    st.markdown("</div>", unsafe_allow_html=True)
-                with cols[1]:
-                    st.markdown("<div style='display:flex;justify-content:center;align-items:center;height:32px;'>", unsafe_allow_html=True)
+                with col2:
                     if st.button("🔽", key=f"bajar_{i}_grande") and i < len(st.session_state.cartel_grande_tabla)-1:
                         df = st.session_state.cartel_grande_tabla.copy()
                         df.iloc[[i, i+1]] = df.iloc[[i+1, i]].values
                         st.session_state.cartel_grande_tabla = df.reset_index(drop=True)
                         st.rerun()
-                    st.markdown("</div>", unsafe_allow_html=True)
-                with cols[2]:
-                    desc = st.session_state.cartel_grande_tabla.iloc[i]['Descripción']
-                    precio = st.session_state.cartel_grande_tabla.iloc[i]['Precio']
+                with st.columns([0.08, 0.92])[0]:
+                    if st.button("🗑️", key=f"eliminar_{i}_grande"):
+                        df = st.session_state.cartel_grande_tabla.drop(i).reset_index(drop=True)
+                        st.session_state.cartel_grande_tabla = df
+                        st.rerun()
+                with st.columns([0.76, 0.24])[0]:
                     st.markdown(
-                        f"<div style='display:flex;align-items:center;height:32px; font-size:19px;'><span>{desc} — {precio}</span></div>",
+                        f"<div style='display:flex;align-items:center;height:32px;font-size:19px;'>{desc} — {precio}</div>",
                         unsafe_allow_html=True
                     )
+
 
         
             # Previsualización
