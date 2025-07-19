@@ -1919,22 +1919,33 @@ elif seccion == "Carteles para imprimir":
                     fuente_titulo = "Manuscrita"
                 except:
                     fuente_titulo = "Times-Roman"
-        
-                # Título
-                c.setFont(fuente_titulo, 32)
-                c.drawCentredString(ancho_hoja/2, alto_hoja - 55, titulo_cartel)
-        
-                # Tabla de líneas (solo las filas que tengan descripción y precio)
+            
+                # --- Cálculo del alto total a imprimir ---
+                n_filas = len([r for _, r in df_final.iterrows() if str(r['Descripción']).strip() != "" and str(r['Precio']).strip() != ""])
+                alto_titulo = 46
+                espacio_titulo_tabla = 36
+                alto_linea = 28
+                alto_tabla = n_filas * alto_linea
+                alto_total = alto_titulo + espacio_titulo_tabla + alto_tabla
+            
+                # --- Punto inicial Y para centrar en la hoja ---
+                y_inicial = (alto_hoja + alto_total) / 2  # Suma porque el PDF arranca de abajo
+            
+                # --- Título centrado ---
+                c.setFont(fuente_titulo, 38)
+                c.drawCentredString(ancho_hoja/2, y_inicial, titulo_cartel)
+            
+                # --- Tabla centrada debajo del título ---
                 c.setFont("Times-Roman", 22)
-                y = alto_hoja - 95
+                y = y_inicial - alto_titulo - espacio_titulo_tabla
                 for _, r in df_final.iterrows():
                     desc = str(r['Descripción']).strip()
                     precio = str(r['Precio']).strip()
                     if desc and precio:
                         txt = f"{desc}   -   {precio}"
                         c.drawCentredString(ancho_hoja/2, y, txt)
-                        y -= 28  # espacio entre filas
-        
+                        y -= alto_linea
+            
                 c.save()
                 buffer.seek(0)
                 st.download_button(
