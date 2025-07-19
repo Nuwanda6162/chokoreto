@@ -1818,4 +1818,65 @@ elif seccion == "Carteles para imprimir":
                 )
 
         with tab2:
-            st.info("Pronto podés armar el cartel grande (Caja de Bombones y más). ¡Lo seguimos en el próximo paso!")
+            st.header("Cartel grande: Caja de bombones (o lo que quieras)")
+            st.info("Acá podés armar tu cartel grande, ideal para promos, cajas de bombones, combos, etc.")
+        
+            # --- Parámetros de tamaño ---
+            from reportlab.lib.pagesizes import A5
+            ancho_hoja, alto_hoja = A5  # A5 vertical (148 x 210 mm)
+            
+            # --- Entrada de título ---
+            titulo_cartel = st.text_input("Título del cartel", value="Caja de bombones")
+            
+            # --- Carga de cantidades y precios (tipo tabla) ---
+            df_default = pd.DataFrame({
+                "Cantidad": [4, 6, 9, 16, 25],
+                "Precio": [7300, 9800, 14900, 25600, 40100]
+            })
+            tabla = st.data_editor(df_default, use_container_width=True, num_rows="dynamic", key="tabla_cartel_grande")
+        
+            # --- Previsualización web ---
+            st.subheader("Previsualización")
+            st.markdown(f"""
+            <div style='width:350px; border:1px solid #ccc; padding:20px 0 40px 0; margin-bottom:20px; background:#fff;'>
+                <div style='font-family:"Dancing Script", "Comic Sans MS", cursive, sans-serif; font-size:38px; text-align:center; margin-bottom:20px;'>{titulo_cartel}</div>
+                <table style='margin:auto; font-size:22px; font-family:serif;'>
+                    {"".join([f"<tr><td style='text-align:right;padding:4px 15px 4px 0;'>{int(r['Cantidad'])}</td><td style='padding:4px 8px;'>-</td><td style='text-align:left;padding:4px 0 4px 10px;'>{int(r['Precio'])}</td></tr>" for _, r in tabla.iterrows()])}
+                </table>
+            </div>
+            """, unsafe_allow_html=True)
+        
+            # --- PDF generación ---
+            if st.button("Generar PDF para imprimir (A5)", key="pdf_cartel_grande"):
+                buffer = io.BytesIO()
+                from reportlab.lib.pagesizes import A5
+                c = canvas.Canvas(buffer, pagesize=A5)
+                
+                # Fuente para título
+                fuente_ttf = "DancingScript-Regular.ttf"
+                try:
+                    pdfmetrics.registerFont(TTFont("Manuscrita", fuente_ttf))
+                    fuente_titulo = "Manuscrita"
+                except:
+                    fuente_titulo = "Times-Roman"
+                
+                # --- Título ---
+                c.setFont(fuente_titulo, 32)
+                c.drawCentredString(ancho_hoja/2, alto_hoja - 55, titulo_cartel)
+                
+                # --- Tabla alineada centrada ---
+                c.setFont("Times-Roman", 22)
+                y = alto_hoja - 95
+                for _, r in tabla.iterrows():
+                    txt = f"{int(r['Cantidad'])}   -   {int(r['Precio'])}"
+                    c.drawCentredString(ancho_hoja/2, y, txt)
+                    y -= 28  # espacio entre filas
+                
+                c.save()
+                buffer.seek(0)
+                st.download_button(
+                    label="Descargar PDF cartel grande",
+                    data=buffer,
+                    file_name="cartel_grande.pdf",
+                    mime="application/pdf"
+                )
