@@ -1827,7 +1827,7 @@ elif seccion == "Carteles para imprimir":
             # Título editable
             titulo_cartel = st.text_input("Título del cartel", value="Caja de bombones")
         
-            # 1. Seleccionás productos (opcional)
+            # Selección de productos
             productos_df = pd.read_sql_query("SELECT nombre, precio_normalizado FROM productos ORDER BY nombre", conn)
             seleccionados = st.multiselect(
                 "Seleccioná productos para agregar como líneas",
@@ -1836,40 +1836,68 @@ elif seccion == "Carteles para imprimir":
                 key="cartel_grande_multiselect"
             )
         
-            # 2. Armás la tabla inicial (con los productos seleccionados)
+            # Inicializa tabla con selección, respeta orden
             if seleccionados:
                 lines_init = productos_df[productos_df["nombre"].isin(seleccionados)].copy()
                 lines_init.rename(columns={"nombre": "Descripción", "precio_normalizado": "Precio"}, inplace=True)
                 lines_init["Descripción"] = lines_init["Descripción"].astype(str)
                 lines_init["Precio"] = lines_init["Precio"].astype(int)
-                # Ordenar según selección
+                # Ordena según multiselect
                 lines_init["sort_order"] = lines_init["Descripción"].apply(lambda x: seleccionados.index(x) if x in seleccionados else -1)
                 lines_init = lines_init.sort_values("sort_order").drop(columns="sort_order")
                 lines_init.reset_index(drop=True, inplace=True)
             else:
                 lines_init = pd.DataFrame({"Descripción": [""], "Precio": [""]})
-
         
-            # 3. Editor para modificar/armar el cartel final
+            # Guarda en session_state para mantener orden después de mover/editar
+            if "cartel_grande_tabla" not in st.session_state or st.session_state.get("cartel_grande_tabla_seleccionados") != seleccionados:
+                st.session_state.cartel_grande_tabla = lines_init.copy()
+                st.session_state.cartel_grande_tabla_seleccionados = seleccionados.copy()
+        
+            # Editor de tabla
             tabla = st.data_editor(
-                lines_init,
+                st.session_state.cartel_grande_tabla,
                 use_container_width=True,
                 num_rows="dynamic",
                 key="tabla_cartel_grande"
             )
+            # Sincroniza con session_state tras edición manual
+            st.session_state.cartel_grande_tabla = tabla.copy()
         
-            # 4. Previsualización
+            # Botones para mover filas
+            st.write("Mover filas (arriba/abajo):")
+            for i in range(len(st.session_state.cartel_grande_tabla)):
+                cols = st.columns([1, 1, 7])
+                with cols[0]:
+                    if st.button("🔼", key=f"subir_{i}_grande") and i > 0:
+                        df = st.session_state.cartel_grande_tabla.copy()
+                        df.iloc[[i-1, i]] = df.iloc[[i, i-1]].values
+                        st.session_state.cartel_grande_tabla = df.reset_index(drop=True)
+                        st.experimental_rerun()
+                with cols[1]:
+                    if st.button("🔽", key=f"bajar_{i}_grande") and i < len(st.session_state.cartel_grande_tabla)-1:
+                        df = st.session_state.cartel_grande_tabla.copy()
+                        df.iloc[[i, i+1]] = df.iloc[[i+1, i]].values
+                        st.session_state.cartel_grande_tabla = df.reset_index(drop=True)
+                        st.experimental_rerun()
+                with cols[2]:
+                    desc = st.session_state.cartel_grande_tabla.iloc[i]['Descripción']
+                    precio = st.session_state.cartel_grande_tabla.iloc[i]['Precio']
+                    st.write(f"{desc} — {precio}")
+        
+            # Previsualización
+            df_final = st.session_state.cartel_grande_tabla
             st.subheader("Previsualización")
             st.markdown(f"""
             <div style='width:350px; border:1px solid #ccc; padding:20px 0 40px 0; margin-bottom:20px; background:#fff;'>
                 <div style='font-family:"Dancing Script", "Comic Sans MS", cursive, sans-serif; font-size:38px; text-align:center; margin-bottom:20px;'>{titulo_cartel}</div>
                 <table style='margin:auto; font-size:22px; font-family:serif;'>
-                    {"".join([f"<tr><td style='text-align:right;padding:4px 15px 4px 0;'>{str(r['Descripción'])}</td><td style='padding:4px 8px;'>-</td><td style='text-align:left;padding:4px 0 4px 10px;'>{str(r['Precio'])}</td></tr>" for _, r in tabla.iterrows() if str(r['Descripción']).strip() != "" and str(r['Precio']).strip() != ""])}
+                    {"".join([f"<tr><td style='text-align:right;padding:4px 15px 4px 0;'>{str(r['Descripción'])}</td><td style='padding:4px 8px;'>-</td><td style='text-align:left;padding:4px 0 4px 10px;'>{str(r['Precio'])}</td></tr>" for _, r in df_final.iterrows() if str(r['Descripción']).strip() != "" and str(r['Precio']).strip() != ""])}
                 </table>
             </div>
             """, unsafe_allow_html=True)
         
-            # 5. PDF
+            # PDF
             if st.button("Generar PDF para imprimir (A5)", key="pdf_cartel_grande"):
                 buffer = io.BytesIO()
                 from reportlab.lib.pagesizes import A5
@@ -1888,7 +1916,7 @@ elif seccion == "Carteles para imprimir":
                 # Tabla de líneas (solo las filas que tengan descripción y precio)
                 c.setFont("Times-Roman", 22)
                 y = alto_hoja - 95
-                for _, r in tabla.iterrows():
+                for _, r in df_final.iterrows():
                     desc = str(r['Descripción']).strip()
                     precio = str(r['Precio']).strip()
                     if desc and precio:
