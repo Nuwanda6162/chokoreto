@@ -1714,20 +1714,27 @@ if seccion == "Carteles para imprimir":
                     use_container_width=True
                 )
 
-                st.subheader("Previsualización")
-                for idx, row in edited.iterrows():
-                    st.markdown(
-                        f"""
+                # --- Parámetros de visualización ---
+                columnas = 5  # cantidad de carteles por fila (igual que en PDF)
+                ancho_px = 140  # ancho visual aprox. de 7 cm a escala
+                alto_px = 140   # alto visual aprox. de 7 cm a escala
+                
+                # --- Previsualización en grid ---
+                st.subheader("Previsualización (rejilla A3)")
+                rows = []
+                row = []
+                for idx, row_data in edited.iterrows():
+                    cartel_html = f"""
                         <div style='
-                            width:140px;
-                            height:140px;
+                            width:{ancho_px}px;
+                            height:{alto_px}px;
                             border:1px solid #bbb;
                             border-radius:8px;
-                            margin-bottom:16px;
+                            margin:8px;
                             background: linear-gradient(to bottom, #fff 50%, #f9f9f9 50%);
                             display:flex;
                             flex-direction:column;
-                            '>
+                        '>
                           <div style='height:50%;'></div>
                           <div style='
                               height:50%;
@@ -1736,12 +1743,24 @@ if seccion == "Carteles para imprimir":
                               justify-content:center;
                               align-items:center;
                           '>
-                            <span style='font-size:10px; font-family:"Comic Sans MS",cursive,sans-serif; font-weight:600; line-height:1;'>{row['Nuevo nombre']}</span>
-                            <span style='font-size:10px; font-family:"Comic Sans MS",cursive,sans-serif; font-weight:700; margin-top:8px; line-height:1;'>{int(row['Nuevo precio'])}</span>
+                            <span style='font-size:16px; font-family:"Comic Sans MS",cursive,sans-serif; font-weight:600; line-height:1;'>{row_data['Nuevo nombre']}</span>
+                            <span style='font-size:13px; font-family:"Comic Sans MS",cursive,sans-serif; font-weight:700; margin-top:5px; line-height:1;'>{int(row_data['Nuevo precio'])}</span>
                           </div>
                         </div>
-                        """, unsafe_allow_html=True
+                    """
+                    row.append(cartel_html)
+                    if len(row) == columnas:
+                        rows.append(row)
+                        row = []
+                if row:
+                    rows.append(row)
+                
+                for r in rows:
+                    st.markdown(
+                        "<div style='display:flex;flex-direction:row;justify-content:left;'>" + "".join(r) + "</div>",
+                        unsafe_allow_html=True
                     )
+
 
 
                 # --- Fuente personalizada para ReportLab ---
