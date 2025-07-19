@@ -1938,11 +1938,11 @@ elif seccion == "Carteles para imprimir":
                 y_inicial = (alto_hoja + alto_total) / 2  # Suma porque el PDF arranca de abajo
             
                 # --- Título centrado ---
-                c.setFont(fuente_titulo, 38)
+                c.setFont(fuente_titulo, 48)
                 c.drawCentredString(ancho_hoja/2, y_inicial, titulo_cartel)
             
                 # --- Tabla centrada debajo del título ---
-                c.setFont("Times-Roman", 22)
+                c.setFont(fuente_titulo, 22)
                 y = y_inicial - alto_titulo - espacio_titulo_tabla
                 for _, r in df_final.iterrows():
                     desc = str(r['Descripción']).strip()
