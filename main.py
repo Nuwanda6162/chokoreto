@@ -1842,10 +1842,13 @@ elif seccion == "Carteles para imprimir":
                 lines_init.rename(columns={"nombre": "Descripción", "precio_normalizado": "Precio"}, inplace=True)
                 lines_init["Descripción"] = lines_init["Descripción"].astype(str)
                 lines_init["Precio"] = lines_init["Precio"].astype(int)
-                # Esto permite que el usuario modifique libremente después
+                # Ordenar según selección
+                lines_init["sort_order"] = lines_init["Descripción"].apply(lambda x: seleccionados.index(x) if x in seleccionados else -1)
+                lines_init = lines_init.sort_values("sort_order").drop(columns="sort_order")
+                lines_init.reset_index(drop=True, inplace=True)
             else:
-                # Si no seleccionás nada, arranca con una tabla vacía
                 lines_init = pd.DataFrame({"Descripción": [""], "Precio": [""]})
+
         
             # 3. Editor para modificar/armar el cartel final
             tabla = st.data_editor(
