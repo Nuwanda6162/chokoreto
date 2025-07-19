@@ -1716,7 +1716,7 @@ elif seccion == "Carteles para imprimir":
                     with colx2:
                         if st.button(f"Quitar '{prod}'", key=f"quitar_{prod}_chico"):
                             st.session_state.carteles_chicos_seleccionados.remove(prod)
-                            st.experimental_rerun()
+                            st.rerun()
 
             if st.session_state.carteles_chicos_seleccionados:
                 editable_df = productos_df[productos_df["nombre"].isin(st.session_state.carteles_chicos_seleccionados)].copy()
@@ -1873,13 +1873,13 @@ elif seccion == "Carteles para imprimir":
                         df = st.session_state.cartel_grande_tabla.copy()
                         df.iloc[[i-1, i]] = df.iloc[[i, i-1]].values
                         st.session_state.cartel_grande_tabla = df.reset_index(drop=True)
-                        st.experimental_rerun()
+                        st.rerun()
                 with cols[1]:
                     if st.button("🔽", key=f"bajar_{i}_grande") and i < len(st.session_state.cartel_grande_tabla)-1:
                         df = st.session_state.cartel_grande_tabla.copy()
                         df.iloc[[i, i+1]] = df.iloc[[i+1, i]].values
                         st.session_state.cartel_grande_tabla = df.reset_index(drop=True)
-                        st.experimental_rerun()
+                        st.rerun()
                 with cols[2]:
                     desc = st.session_state.cartel_grande_tabla.iloc[i]['Descripción']
                     precio = st.session_state.cartel_grande_tabla.iloc[i]['Precio']
