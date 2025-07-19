@@ -1045,13 +1045,13 @@ elif seccion == "📉 Reportes":
     ])
     with tab1:
         st.title("📈 Visor de Ventas (editable)")
-        
+    
         col1, col2 = st.columns(2)
         with col1:
             fecha_desde = st.date_input("Desde", value=date.today(), key="fecha_inicio")
         with col2:
             fecha_hasta = st.date_input("Hasta", value=date.today(), key="fecha_fin")
-        
+    
         if fecha_desde > fecha_hasta:
             st.warning("La fecha 'Desde' no puede ser posterior a 'Hasta'")
         else:
@@ -1064,7 +1064,7 @@ elif seccion == "📉 Reportes":
                 WHERE v.fecha BETWEEN %s AND %s
                 ORDER BY v.fecha DESC
             """, conn, params=(str(fecha_desde), str(fecha_hasta)))
-        
+    
             if ventas_df.empty:
                 st.info("No se encontraron ventas en el rango seleccionado.")
             else:
@@ -1073,10 +1073,10 @@ elif seccion == "📉 Reportes":
                 productos_lista = productos_df["nombre"].tolist()
                 productos_dict = dict(zip(productos_df["nombre"], productos_df["id"]))
                 productos_precio = dict(zip(productos_df["nombre"], productos_df["precio_normalizado"]))
-        
-                edit_cols = ["fecha", "producto", "cantidad", "tipo_pago", "descripcion"]
+    
+                edit_cols = ["fecha", "producto", "cantidad", "tipo_pago", "precio_unitario", "total", "descripcion"]
                 editable_df = ventas_df[["id"] + edit_cols].copy()
-        
+    
                 # --- Conversión y control de tipos ---
                 editable_df["fecha"] = pd.to_datetime(editable_df["fecha"], errors="coerce").dt.date
                 if not editable_df["producto"].isin(productos_lista).all():
@@ -1085,16 +1085,20 @@ elif seccion == "📉 Reportes":
                     editable_df.loc[~editable_df["tipo_pago"].isin(["Efectivo", "Otros"]), "tipo_pago"] = "Efectivo"
                 editable_df = editable_df.fillna({"descripcion": ""})
                 editable_df["cantidad"] = editable_df["cantidad"].astype(float)
-        
+                editable_df["precio_unitario"] = editable_df["precio_unitario"].astype(float)
+                editable_df["total"] = editable_df["total"].astype(float)
+    
                 column_config = {
                     "id": st.column_config.Column("ID", disabled=True),
                     "fecha": st.column_config.DateColumn("Fecha"),
                     "producto": st.column_config.SelectboxColumn("Producto", options=productos_lista),
                     "cantidad": st.column_config.NumberColumn("Cantidad / Importe", min_value=0, step=1),
                     "tipo_pago": st.column_config.SelectboxColumn("Tipo de pago", options=["Efectivo", "Otros"]),
+                    "precio_unitario": st.column_config.NumberColumn("Precio Unitario", min_value=0, format="%.2f"),
+                    "total": st.column_config.NumberColumn("Total", min_value=0, format="%.2f"),
                     "descripcion": st.column_config.TextColumn("Descripción"),
                 }
-        
+    
                 # --- Expander para edición ---
                 with st.expander("Editar ventas (abrir solo si necesitás cambiar algo)", expanded=False):
                     edited = st.data_editor(
@@ -1103,25 +1107,28 @@ elif seccion == "📉 Reportes":
                         num_rows="dynamic",
                         key="ventas_editor"
                     )
-        
+    
                     if st.button("💾 Guardar cambios en ventas"):
                         cambios = 0
                         for idx, row in edited.iterrows():
                             orig_row = editable_df.loc[idx]
-                            if not (row == orig_row).all():
+                            # Compara todos los campos editables
+                            if not (row[edit_cols] == orig_row[edit_cols]).all():
                                 prod_id = productos_dict[row["producto"]]
-                                if row["producto"].lower() in ["ingreso libre", "seña", "adelanto", "varios", "otros"]:
-                                    # Importe libre
-                                    precio_unitario = 1
-                                    cantidad = row["cantidad"]  # Cantidad = importe recibido
-                                else:
-                                    precio_unitario = productos_precio[row["producto"]]
-                                    cantidad = row["cantidad"]
+                                # Permite modificar tanto cantidad, precio_unitario como total
                                 cursor.execute("""
                                     UPDATE ventas
-                                    SET fecha = %s, producto_id = %s, cantidad = %s, tipo_pago = %s, descripcion = %s, precio_unitario = %s
+                                    SET fecha = %s, producto_id = %s, cantidad = %s, tipo_pago = %s, precio_unitario = %s, descripcion = %s
                                     WHERE id = %s
-                                """, (row["fecha"], prod_id, cantidad, row["tipo_pago"], row["descripcion"], precio_unitario, row["id"]))
+                                """, (
+                                    row["fecha"],
+                                    prod_id,
+                                    row["cantidad"],
+                                    row["tipo_pago"],
+                                    row["precio_unitario"],
+                                    row["descripcion"],
+                                    row["id"]
+                                ))
                                 cambios += 1
                         conn.commit()
                         if cambios:
@@ -1129,7 +1136,7 @@ elif seccion == "📉 Reportes":
                             st.rerun()
                         else:
                             st.info("No hubo cambios para guardar.")
-        
+    
                 # --- Tabla historial de ventas (siempre visible, no editable) ---
                 ventas_df = pd.read_sql_query("""
                     SELECT v.id, v.fecha, p.nombre AS producto, v.cantidad, v.tipo_pago, v.precio_unitario,
@@ -1141,7 +1148,7 @@ elif seccion == "📉 Reportes":
                     ORDER BY v.fecha DESC
                 """, conn, params=(str(fecha_desde), str(fecha_hasta)))
                 st.dataframe(ventas_df)
-        
+    
                 # --- Opción para eliminar una venta puntual ---
                 st.subheader("🗑️ Eliminar una venta puntual")
                 ventas_df["info"] = (
@@ -1151,11 +1158,11 @@ elif seccion == "📉 Reportes":
                     " – $" + ventas_df["total"].round(2).astype(str)
                 )
                 venta_dict = dict(zip(ventas_df["info"], ventas_df["id"]))
-        
+    
                 if venta_dict:
                     venta_sel = st.selectbox("Seleccioná la venta a eliminar", list(venta_dict.keys()), key="venta_del_sel")
                     venta_id = venta_dict[venta_sel]
-        
+    
                     if st.button("❌ Eliminar esta venta", key="btn_eliminar_venta"):
                         try:
                             cursor.execute("DELETE FROM ventas WHERE id = %s", (venta_id,))
@@ -1166,13 +1173,13 @@ elif seccion == "📉 Reportes":
                             st.error(f"❌ Ocurrió un error al eliminar la venta: {e}")
                 else:
                     st.info("No hay ventas para eliminar en este resultado.")
-        
+    
                 # --- Totales por día ---
                 total_dia = ventas_df.groupby("fecha")["total"].sum().reset_index()
                 total_dia.columns = ["Fecha", "Total del día"]
                 st.subheader("💰 Total de ventas por día")
                 st.table(total_dia)
-        
+    
                 total_general = ventas_df["total"].sum()
                 st.success(f"🧮 Total del período: **${round(total_general, 2)}**")
 
