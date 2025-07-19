@@ -1721,25 +1721,16 @@ elif seccion == "Carteles para imprimir":
 
                 cartelitos_html = []
                 for idx, row in edited.iterrows():
-                    cartelitos_html.append(f"""
-                        <div style='
-                            width:{ancho_px}px;
-                            height:{alto_px}px;
-                            border:1px solid #bbb;
-                            border-radius:8px;
-                            margin:8px;
-                            background: linear-gradient(to bottom, #fff 50%, #f9f9f9 50%);
-                            display:flex;
-                            flex-direction:column;'>
-                          <div style='height:50%;'></div>
-                          <div style='height:50%;display:flex;flex-direction:column;justify-content:center;align-items:center;'>
-                            <span style='font-size:16px; font-family:"Comic Sans MS",cursive,sans-serif; font-weight:600; line-height:1;'>{row['Nuevo nombre']}</span>
-                            <span style='font-size:13px; font-family:"Comic Sans MS",cursive,sans-serif; font-weight:700; margin-top:5px; line-height:1;'>{int(row['Nuevo precio'])}</span>
-                          </div>
-                        </div>
-                    """)
-
-                # Mostramos la grilla real, usando solo st.markdown y chunks de 5 por fila
+                    cartelitos_html.append(
+                        f"<div style='width:{ancho_px}px;height:{alto_px}px;border:1px solid #bbb;border-radius:8px;margin:8px;"
+                        "background:linear-gradient(to bottom,#fff 50%,#f9f9f9 50%);display:flex;flex-direction:column;'>"
+                        "<div style='height:50%;'></div>"
+                        "<div style='height:50%;display:flex;flex-direction:column;justify-content:center;align-items:center;'>"
+                        f"<span style='font-size:16px;font-family:\"Comic Sans MS\",cursive,sans-serif;font-weight:600;line-height:1;'>{row['Nuevo nombre']}</span>"
+                        f"<span style='font-size:13px;font-family:\"Comic Sans MS\",cursive,sans-serif;font-weight:700;margin-top:5px;line-height:1;'>{int(row['Nuevo precio'])}</span>"
+                        "</div></div>"
+                    )
+                
                 for i in range(0, len(cartelitos_html), columnas):
                     fila_html = "".join(cartelitos_html[i:i+columnas])
                     st.markdown(
