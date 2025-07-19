@@ -1659,7 +1659,21 @@ elif seccion == "Carteles para imprimir":
 
     st.title("🖨️ Generar carteles de precios")
     carteles_por_fila = 5
-    
+
+    # Función para dividir texto largo en dos líneas (centrado)
+    def wrap_centrado(texto, maxlen=18):
+        palabras = texto.split()
+        if len(texto) <= maxlen or len(palabras) == 1:
+            return [texto]
+        else:
+            for i in range(len(palabras)//2, 0, -1):
+                linea1 = " ".join(palabras[:i])
+                linea2 = " ".join(palabras[i:])
+                if len(linea1) <= maxlen and len(linea2) <= maxlen:
+                    return [linea1, linea2]
+            mid = len(texto)//2
+            return [texto[:mid], texto[mid:]]
+
     if A3 is None:
         st.warning("Para usar esta función, primero instalá la librería reportlab (pip install reportlab)")
     else:
@@ -1731,7 +1745,6 @@ elif seccion == "Carteles para imprimir":
                         f"<span style='font-size:13px;font-family:\"Comic Sans MS\",cursive,sans-serif;font-weight:700;margin-top:5px;line-height:1;'>{int(row['Nuevo precio'])}</span>"
                         "</div></div>"
                     )
-                
                 for i in range(0, len(cartelitos_html), columnas):
                     fila_html = "".join(cartelitos_html[i:i+columnas])
                     st.markdown(
@@ -1762,20 +1775,19 @@ elif seccion == "Carteles para imprimir":
                     fuente = "Manuscrita"
                 except:
                     fuente = "Times-Roman"  # fallback
-                
+
                 x, y = margen, alto_hoja - alto_cartel - margen
                 count = 0
                 for idx, row in edited.iterrows():
-                    # --- Salto de página si no hay espacio para una fila más ---
                     if y < margen:
                         c.showPage()
                         x, y = margen, alto_hoja - alto_cartel - margen
-                        count = 0
-                
+                        count = 0  # ¡Reinicia el contador!
+                        
                     c.rect(x, y, ancho_cartel, alto_cartel, stroke=1, fill=0)
                     centro_x = x + ancho_cartel / 2
                     centro_y = y + alto_cartel / 4
-                
+
                     # --- WRAP y centrado en dos líneas ---
                     lineas = wrap_centrado(str(row["Nuevo nombre"]), maxlen=18)
                     if len(lineas) == 1:
@@ -1787,7 +1799,7 @@ elif seccion == "Carteles para imprimir":
                         c.drawCentredString(centro_x, centro_y - 2, lineas[1])
                     c.setFont(fuente, 16)
                     c.drawCentredString(centro_x, centro_y - 18, str(int(row['Nuevo precio'])))
-                
+
                     count += 1
                     if count % carteles_por_fila == 0:
                         x = margen
@@ -1795,9 +1807,6 @@ elif seccion == "Carteles para imprimir":
                     else:
                         x += ancho_cartel + margen
 
-                    if y < margen:
-                        c.showPage()
-                        x, y = margen, alto_hoja - alto_cartel - margen
 
                 c.save()
                 buffer.seek(0)
