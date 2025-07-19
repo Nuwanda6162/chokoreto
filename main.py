@@ -1919,12 +1919,21 @@ elif seccion == "Carteles para imprimir":
                 buffer = io.BytesIO()
                 from reportlab.lib.pagesizes import A5
                 c = canvas.Canvas(buffer, pagesize=A5)
-                fuente_ttf = "MonsieurLaDoulaise-Regular.ttf"
+                fuente_titulo_ttf = "MonsieurLaDoulaise-Regular.ttf"
+                fuente_cuerpo_ttf = "Tinos-Regular.ttf"
+              
                 try:
-                    pdfmetrics.registerFont(TTFont("Manuscrita", fuente_ttf))
+                    pdfmetrics.registerFont(TTFont("Manuscrita", fuente_titulo_ttf))
                     fuente_titulo = "Manuscrita"
                 except:
                     fuente_titulo = "Times-Roman"
+
+                try:
+                    pdfmetrics.registerFont(TTFont("Cuerpo", fuente_cuerpo_ttf))
+                    fuente_cuerpo = "Cuerpo"
+                except:
+                    fuente_cuerpo = "Times-Roman"
+                
             
                 # --- Cálculo del alto total a imprimir ---
                 n_filas = len([r for _, r in df_final.iterrows() if str(r['Descripción']).strip() != "" and str(r['Precio']).strip() != ""])
@@ -1942,7 +1951,7 @@ elif seccion == "Carteles para imprimir":
                 c.drawCentredString(ancho_hoja/2, y_inicial, titulo_cartel)
             
                 # --- Tabla centrada debajo del título ---
-                c.setFont(fuente_titulo, 22)
+                c.setFont(fuente_cuerpo, 22)
                 y = y_inicial - alto_titulo - espacio_titulo_tabla
                 for _, r in df_final.iterrows():
                     desc = str(r['Descripción']).strip()
