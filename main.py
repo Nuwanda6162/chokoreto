@@ -887,6 +887,7 @@ elif seccion == "💵 Movimientos":
     with tab1:
         st.title("📦 Registrar Venta")
     
+        # Reset rápido después de registrar
         if st.session_state.get("venta_recien_registrada", False):
             st.session_state["desc_libre"] = ""
             st.session_state["venta_recien_registrada"] = False
@@ -908,6 +909,7 @@ elif seccion == "💵 Movimientos":
                 "Buscar producto (nombre, subcategoría o categoría):",
                 value="", key="busqueda_venta"
             ).lower()
+    
             if busqueda:
                 productos_filtrados = productos_full[
                     productos_full["nombre"].str.lower().str.contains(busqueda) |
@@ -920,19 +922,39 @@ elif seccion == "💵 Movimientos":
             if productos_filtrados.empty:
                 st.warning("No se encontraron productos que coincidan.")
             else:
+                # Armado de opciones visibles
                 opciones = productos_filtrados["nombre"] + " [" + productos_filtrados["categoria"] + " / " + productos_filtrados["subcategoria"] + "]"
-                prod_idx = st.selectbox("Seleccioná el producto", opciones.tolist(), key="prod_busqueda")
-                producto = productos_filtrados.iloc[opciones.tolist().index(prod_idx)]
+                opcion_seleccionada = st.selectbox("Seleccioná el producto", opciones.tolist(), key="prod_busqueda")
+                producto = productos_filtrados.iloc[opciones.tolist().index(opcion_seleccionada)]
     
-                precio_actual = float(producto['precio_normalizado'])
-                categoria = producto['categoria']
-                subcategoria = producto['subcategoria']
+                # Datos base del producto
+                prod_id_actual = int(producto["id"])
+                precio_actual = float(producto["precio_normalizado"])
+                categoria = producto["categoria"]
+                subcategoria = producto["subcategoria"]
+    
+                # --- FIX DE SINCRONIZACIÓN DEL PRECIO ---
+                # 1) Inicializar el state del precio si no existe
+                if "precio_unitario_manual" not in st.session_state:
+                    st.session_state["precio_unitario_manual"] = precio_actual
+    
+                # 2) Detectar cambio de producto y forzar actualización del widget
+                #    (IMPORTANTÍSIMO: hay que comparar por ID, no por label)
+                if st.session_state.get("venta_last_prod_id") != prod_id_actual:
+                    st.session_state["venta_last_prod_id"] = prod_id_actual
+                    st.session_state["precio_unitario_manual"] = precio_actual
+                    # Si querés ver el cambio incluso dentro de forms, podés forzar:
+                    # st.rerun()
     
                 # --- Inputs principales en columnas ---
                 col1, col2, col3 = st.columns([1, 1, 1])
                 with col1:
                     cantidad = st.number_input(
-                        "Cantidad", min_value=1,  value=st.session_state.get("cant_venta", 1), step=1, key="cant_venta"
+                        "Cantidad",
+                        min_value=1,
+                        value=st.session_state.get("cant_venta", 1),
+                        step=1,
+                        key="cant_venta"
                     )
                 with col2:
                     tipo_pago_default = st.session_state.get("tipo_pago", "Efectivo")
@@ -945,10 +967,11 @@ elif seccion == "💵 Movimientos":
                     precio_unitario_manual = st.number_input(
                         "Precio unitario de venta",
                         min_value=0.01,
-                        value=precio_actual,
+                        value=st.session_state["precio_unitario_manual"],  # LEE SIEMPRE DEL STATE
                         step=1.0,
-                        key="precio_unitario_manual"
+                        key="precio_unitario_manual"  # Y ESCRIBE EN EL MISMO STATE
                     )
+    
                     st.markdown(
                         f"""
                         <div style="background:#e6f7ff; padding:10px 20px; border-radius:8px; border:1px solid #91d5ff;">
@@ -956,13 +979,16 @@ elif seccion == "💵 Movimientos":
                         <b>Categoría:</b> {categoria}<br>
                         <b>Subcategoría:</b> {subcategoria}
                         </div>
-                        """, unsafe_allow_html=True
+                        """,
+                        unsafe_allow_html=True
                     )
     
                 # --- Opciones avanzadas ---
                 with st.expander("Opciones avanzadas (descuento, fecha, descripción)"):
                     descuento = st.number_input(
-                        "Descuento (%)", min_value=0.0, max_value=100.0, value=0.0, step=0.5, key="desc_venta"
+                        "Descuento (%)", min_value=0.0, max_value=100.0,
+                        value=st.session_state.get("desc_venta", 0.0),
+                        step=0.5, key="desc_venta"
                     )
                     fecha_actual = st.date_input("Fecha de la venta", key="fecha_new")
                     descripcion_libre = st.text_area("Descripción (ej: seña, nota)", key="desc_libre")
@@ -978,7 +1004,8 @@ elif seccion == "💵 Movimientos":
                         <span style="font-size:1.2em;">💲 <b>Precio final unitario:</b> ${precio_unitario_con_descuento:,.2f}</span><br>
                         <span style="font-size:1.2em;">💰 <b>Total de esta venta:</b> ${total:,.2f}</span>
                     </div>
-                    """, unsafe_allow_html=True
+                    """,
+                    unsafe_allow_html=True
                 )
     
                 # --- Botón para registrar ---
@@ -986,10 +1013,10 @@ elif seccion == "💵 Movimientos":
                 with btn_cols[1]:
                     if st.button("🟢 Registrar Venta", key="btn_guardar_venta"):
                         try:
-                            if not producto['id'] or cantidad <= 0 or precio_unitario_manual <= 0:
+                            if not producto["id"] or cantidad <= 0 or precio_unitario_manual <= 0:
                                 st.error("❌ Completá todos los datos de la venta.")
                             else:
-                                producto_id = int(producto['id'])
+                                producto_id = int(producto["id"])
                                 import datetime
                                 fecha_str = str(fecha_actual)
                                 cursor.execute("""
@@ -997,8 +1024,11 @@ elif seccion == "💵 Movimientos":
                                     VALUES (%s, %s, %s, %s, %s, %s)
                                 """, (producto_id, cantidad, tipo_pago, fecha_str, precio_unitario_con_descuento, descripcion_libre))
                                 conn.commit()
+    
                                 st.session_state["tipo_pago"] = tipo_pago
-                                st.session_state['ultima_venta'] = f"{cantidad} × {producto['nombre']} ({categoria} / {subcategoria}) – ${total:,.2f} el {fecha_str}"
+                                st.session_state["ultima_venta"] = (
+                                    f"{cantidad} × {producto['nombre']} ({categoria} / {subcategoria}) – ${total:,.2f} el {fecha_str}"
+                                )
                                 st.success(f"✅ Venta registrada: {cantidad} × {producto['nombre']} – ${total:,.2f}")
                                 st.session_state["venta_recien_registrada"] = True
                                 st.rerun()
