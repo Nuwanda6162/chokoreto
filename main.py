@@ -678,26 +678,69 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
         else:
             st.warning("No hay categorías de productos cargadas.")
     
+        # --- BOTÓN GLOBAL: recalcular TODOS los productos desde sus ingredientes ---
         if st.button("🔄 Recalcular precios de TODOS los productos", key="recalcular_todos_prod"):
             try:
-                productos = pd.read_sql_query("SELECT id, margen, precio_costo FROM productos", conn)
-                cambios = 0
-                for _, prod in productos.iterrows():
-                    margen = float(prod["margen"])
-                    precio_costo = float(prod["precio_costo"])
-                    precio_final = round(precio_costo * margen, 2)
-                    precio_normalizado = float(redondeo_personalizado(precio_final))
-                    cursor.execute("""
-                        UPDATE productos
-                        SET precio_final = %s, precio_normalizado = %s
-                        WHERE id = %s
-                    """, (precio_final, precio_normalizado, int(prod["id"])))
-                    cambios += 1
-                conn.commit()
-                st.success(f"¡Precios recalculados en {cambios} productos!")
-                st.rerun()
+                # Traigo todos los productos
+                productos = pd.read_sql_query("SELECT id, margen FROM productos", conn)
+                if productos.empty:
+                    st.info("No hay productos para recalcular.")
+                else:
+                    actualizados = 0
+
+                    for _, prod in productos.iterrows():
+                        pid = int(prod["id"])
+                        margen = float(prod["margen"]) if prod["margen"] is not None else 1.0
+
+                        # Traer ingredientes de este producto
+                        ing_df = pd.read_sql_query(
+                            """
+                            SELECT ip.cantidad_usada, mp.precio_por_unidad
+                            FROM ingredientes_producto ip
+                            JOIN materias_primas mp ON ip.materia_prima_id = mp.id
+                            WHERE ip.producto_id = %s
+                            """,
+                            conn,
+                            params=(pid,)
+                        )
+
+                        # Calcular costo total desde ingredientes
+                        if not ing_df.empty:
+                            costo_total = (ing_df["cantidad_usada"] * ing_df["precio_por_unidad"]).sum()
+                        else:
+                            costo_total = 0.0
+
+                        # casteos seguros
+                        costo_total = float(costo_total)
+                        margen = float(margen)
+
+                        precio_final = round(costo_total * margen, 2)
+                        precio_final = float(precio_final)
+
+                        precio_normalizado = redondeo_personalizado(precio_final)
+                        precio_normalizado = int(precio_normalizado)
+
+                        # Actualizar producto
+                        cursor.execute(
+                            """
+                            UPDATE productos
+                            SET precio_costo = %s,
+                                precio_final = %s,
+                                precio_normalizado = %s
+                            WHERE id = %s
+                            """,
+                            (costo_total, precio_final, precio_normalizado, pid)
+                        )
+
+                        actualizados += 1
+
+                    conn.commit()
+                    st.success(f"✅ Recalculé {actualizados} producto(s) desde las materias primas.")
+                    st.rerun()
+
             except Exception as e:
                 st.error(f"❌ Ocurrió un error al recalcular precios: {e}")
+
 
 
     
