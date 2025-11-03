@@ -147,8 +147,10 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                                     # Recalculo automático de productos
                                     prod_ids = pd.read_sql_query(
                                         "SELECT producto_id FROM ingredientes_producto WHERE materia_prima_id = %s",
-                                        conn, params=(row["id"],)
+                                        conn,
+                                        params=(row["id"],)
                                     )["producto_id"].tolist()
+                                    
                                     for pid in prod_ids:
                                         q = """
                                             SELECT ip.cantidad_usada, mp.precio_por_unidad
@@ -157,18 +159,41 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                                             WHERE ip.producto_id = %s
                                         """
                                         ing_df = pd.read_sql_query(q, conn, params=(pid,))
-                                        costo_total = (ing_df["cantidad_usada"] * ing_df[
-                                            "precio_por_unidad"]).sum() if not ing_df.empty else 0.0
-                                        margen = pd.read_sql_query("SELECT margen FROM productos WHERE id = %s", conn,
-                                                                   params=(pid,)).iloc[0]["margen"]
+                                    
+                                        if not ing_df.empty:
+                                            costo_total = (ing_df["cantidad_usada"] * ing_df["precio_por_unidad"]).sum()
+                                        else:
+                                            costo_total = 0.0
+                                    
+                                        # CASTEO TODO A float nativo
+                                        costo_total = float(costo_total)
+                                    
+                                        margen = pd.read_sql_query(
+                                            "SELECT margen FROM productos WHERE id = %s",
+                                            conn,
+                                            params=(pid,)
+                                        ).iloc[0]["margen"]
+                                        margen = float(margen)
+                                    
                                         precio_final = round(costo_total * margen, 2)
+                                        precio_final = float(precio_final)
+                                    
                                         precio_normalizado = redondeo_personalizado(precio_final)
-                                        cursor.execute("""
+                                        # si querés que sea número y no np.int64
+                                        precio_normalizado = int(precio_normalizado)
+                                    
+                                        cursor.execute(
+                                            """
                                             UPDATE productos
-                                            SET precio_costo = %s, precio_final = %s, precio_normalizado = %s
+                                            SET precio_costo = %s,
+                                                precio_final = %s,
+                                                precio_normalizado = %s
                                             WHERE id = %s
-                                        """, (costo_total, precio_final, precio_normalizado, pid))
+                                            """,
+                                            (costo_total, precio_final, precio_normalizado, pid)
+                                        )
                                         conn.commit()
+
                                     cambios += 1
                                 except Exception as e:
                                     st.error(f"❌ Error al actualizar la fila ID {row['id']}: {e}")
