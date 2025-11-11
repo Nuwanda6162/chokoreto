@@ -367,6 +367,29 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                     st.info("No hubo cambios para guardar.")
 
             st.caption("Editá el nombre de la subcategoría y luego tocá 'Guardar cambios'.")
+        st.subheader("Eliminar subcategoría de materias primas")
+
+        # Armo un dict para elegir
+        subcat_dict = dict(zip(subcats_df["nombre"] + " (" + subcats_df["categoria"] + ")", subcats_df["id"]))
+        subcat_sel_del = st.selectbox(
+            "Seleccioná la subcategoría a eliminar",
+            sorted(subcat_dict.keys()),
+            key="subcat_mp_del_sel"
+        )
+        subcat_id_del = subcat_dict[subcat_sel_del]
+
+        st.warning("⚠️ Si la subcategoría tiene materias primas asociadas, la base no te va a dejar borrarla.")
+        if st.button("❌ Eliminar subcategoría de MP", key="btn_del_subcat_mp"):
+            try:
+                cursor.execute("DELETE FROM subcategorias_mp WHERE id = %s", (subcat_id_del,))
+                conn.commit()
+                st.success("Subcategoría eliminada correctamente.")
+                st.rerun()
+            except psycopg2.IntegrityError:
+                st.error("❌ No se puede eliminar: hay materias primas asociadas. Borrá o reasigná primero esas materias primas.")
+            except Exception as e:
+                st.error(f"❌ Ocurrió un error al eliminar: {e}")
+            
 
         st.subheader("Agregar nueva subcategoría de materias primas")
 
@@ -507,6 +530,35 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                     st.info("No hubo cambios para guardar.")
 
             st.caption("Editá el nombre de la subcategoría y luego tocá 'Guardar cambios'.")
+
+        st.subheader("Eliminar subcategoría de productos")
+
+        subcat_prod_dict = dict(
+            zip(
+                subcats_prod_df["nombre"] + " (" + subcats_prod_df["categoria"] + ")",
+                subcats_prod_df["id"]
+            )
+        )
+
+        subcat_prod_sel = st.selectbox(
+            "Seleccioná la subcategoría de producto a eliminar",
+            sorted(subcat_prod_dict.keys()),
+            key="subcat_prod_del_sel"
+        )
+        subcat_prod_id = subcat_prod_dict[subcat_prod_sel]
+
+        st.warning("⚠️ Si hay productos asociados a esa subcategoría, la base no te va a dejar borrarla.")
+        if st.button("❌ Eliminar subcategoría de producto", key="btn_del_subcat_prod"):
+            try:
+                cursor.execute("DELETE FROM subcategorias_productos WHERE id = %s", (subcat_prod_id,))
+                conn.commit()
+                st.success("Subcategoría de producto eliminada correctamente.")
+                st.rerun()
+            except psycopg2.IntegrityError:
+                st.error("❌ No se puede eliminar: hay productos asociados a esta subcategoría. Reasignalos o borrálos primero.")
+            except Exception as e:
+                st.error(f"❌ Ocurrió un error al eliminar: {e}")
+
 
         cat_sub_sel = st.selectbox("Categoría para la subcategoría", cat_prod_df["nombre"].tolist(),
                                    key="cat_sub_sel_prod")
