@@ -505,7 +505,6 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                 column_config={
                     "id": st.column_config.Column("ID", disabled=True),
                     "nombre": st.column_config.TextColumn("Nombre"),
-                    # "categoria" solo se muestra, no es editable aquí
                 },
                 num_rows="dynamic",
                 key="data_editor_subcatprod"
@@ -518,7 +517,7 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
                     if row["nombre"] != orig_row["nombre"]:
                         try:
                             cursor.execute("UPDATE subcategorias_productos SET nombre = %s WHERE id = %s",
-                                           (row["nombre"], row["id"]))
+                                           (row["nombre"], int(row["id"])))
                             conn.commit()
                             cambios += 1
                         except Exception as e:
@@ -531,46 +530,46 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
 
             st.caption("Editá el nombre de la subcategoría y luego tocá 'Guardar cambios'.")
 
-        st.subheader("Eliminar subcategoría de productos")
-
-        subcat_prod_dict = dict(
-            zip(
-                subcats_prod_df["nombre"] + " (" + subcats_prod_df["categoria"] + ")",
-                subcats_prod_df["id"]
+            # 👇 Bloque que agregamos antes: eliminar subcategoría
+            st.subheader("Eliminar subcategoría de productos")
+            subcat_prod_dict = dict(
+                zip(
+                    subcats_prod_df["nombre"] + " (" + subcats_prod_df["categoria"] + ")",
+                    subcats_prod_df["id"]
+                )
             )
+            subcat_prod_sel = st.selectbox(
+                "Seleccioná la subcategoría de producto a eliminar",
+                sorted(subcat_prod_dict.keys()),
+                key="subcat_prod_del_sel"
+            )
+            subcat_prod_id = int(subcat_prod_dict[subcat_prod_sel])
+
+            st.warning("⚠️ Si hay productos asociados a esa subcategoría, la base no te va a dejar borrarla.")
+            if st.button("❌ Eliminar subcategoría de producto", key="btn_del_subcat_prod"):
+                try:
+                    cursor.execute("DELETE FROM subcategorias_productos WHERE id = %s", (subcat_prod_id,))
+                    conn.commit()
+                    st.success("Subcategoría de producto eliminada correctamente.")
+                    st.rerun()
+                except psycopg2.IntegrityError:
+                    st.error("❌ No se puede eliminar: hay productos asociados a esta subcategoría. Reasignalos o borrálos primero.")
+                except Exception as e:
+                    st.error(f"❌ Ocurrió un error al eliminar: {e}")
+
+        cat_sub_sel = st.selectbox(
+            "Categoría para la subcategoría",
+            cat_prod_df["nombre"].tolist(),
+            key="cat_sub_sel_prod"
         )
-
-        subcat_prod_sel = st.selectbox(
-            "Seleccioná la subcategoría de producto a eliminar",
-            sorted(subcat_prod_dict.keys()),
-            key="subcat_prod_del_sel"
-        )
-        subcat_prod_id = subcat_prod_dict[subcat_prod_sel]
-
-        st.warning("⚠️ Si hay productos asociados a esa subcategoría, la base no te va a dejar borrarla.")
-        if st.button("❌ Eliminar subcategoría de producto", key="btn_del_subcat_prod"):
-            try:
-                cursor.execute("DELETE FROM subcategorias_productos WHERE id = %s", (subcat_prod_id,))
-                conn.commit()
-                st.success("Subcategoría de producto eliminada correctamente.")
-                st.rerun()
-            except psycopg2.IntegrityError:
-                st.error("❌ No se puede eliminar: hay productos asociados a esta subcategoría. Reasignalos o borrálos primero.")
-            except Exception as e:
-                st.error(f"❌ Ocurrió un error al eliminar: {e}")
-
-
-        cat_sub_sel = st.selectbox("Categoría para la subcategoría", cat_prod_df["nombre"].tolist(),
-                                   key="cat_sub_sel_prod")
-        cat_sub_id = cat_dict[cat_sub_sel]
-
-        # Mostrar solo las subcategorías de la categoría seleccionada
+        cat_sub_id = int(cat_dict[cat_sub_sel])  # 👈 forzamos int
+        
         subcats_df = pd.read_sql_query("""
-                SELECT sp.id, sp.nombre, cp.nombre AS categoria
-                FROM subcategorias_productos sp
-                JOIN categoria_productos cp ON sp.categoria_id = cp.id
-                WHERE cp.id = %s
-            """, conn, params=(cat_sub_id,))
+            SELECT sp.id, sp.nombre, cp.nombre AS categoria
+            FROM subcategorias_productos sp
+            JOIN categoria_productos cp ON sp.categoria_id = cp.id
+            WHERE cp.id = %s
+        """, conn, params=(cat_sub_id,))
 
         if subcats_df.empty:
             st.info("No hay subcategorías cargadas para esta categoría.")
