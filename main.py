@@ -1080,17 +1080,23 @@ elif seccion == "💵 Movimientos":
                 precio_actual = float(producto["precio_normalizado"])
                 categoria = producto["categoria"]
                 subcategoria = producto["subcategoria"]
-    
+
+
+                # ponemos un mínimo seguro para el widget
+                precio_minimo_widget = 0.01
+                # si el precio_actual viene en 0 o None, usamos 0.01
+                precio_actual_seguro = precio_actual if precio_actual and precio_actual > 0 else precio_minimo_widget
+
                 # --- FIX DE SINCRONIZACIÓN DEL PRECIO ---
                 # 1) Inicializar el state del precio si no existe
                 if "precio_unitario_manual" not in st.session_state:
-                    st.session_state["precio_unitario_manual"] = precio_actual
+                    st.session_state["precio_unitario_manual"] = precio_actual_seguro
     
                 # 2) Detectar cambio de producto y forzar actualización del widget
                 #    (IMPORTANTÍSIMO: hay que comparar por ID, no por label)
                 if st.session_state.get("venta_last_prod_id") != prod_id_actual:
                     st.session_state["venta_last_prod_id"] = prod_id_actual
-                    st.session_state["precio_unitario_manual"] = precio_actual
+                    st.session_state["precio_unitario_manual"] = precio_actual_seguro
                     # Si querés ver el cambio incluso dentro de forms, podés forzar:
                     # st.rerun()
     
@@ -1115,7 +1121,8 @@ elif seccion == "💵 Movimientos":
                     precio_unitario_manual = st.number_input(
                         "Precio unitario de venta",
                         min_value=0.01,
-                        value=st.session_state["precio_unitario_manual"],  # LEE SIEMPRE DEL STATE
+                        # por las dudas, volvemos a forzar el mínimo acá
+                        value=max(st.session_state.get("precio_unitario_manual", 0.01), 0.01),
                         step=1.0,
                         key="precio_unitario_manual"  # Y ESCRIBE EN EL MISMO STATE
                     )
