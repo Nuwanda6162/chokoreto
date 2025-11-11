@@ -53,6 +53,34 @@ def redondeo_personalizado(valor):
 def redondeo_personalizadov2(valor):
     return math.ceil(valor / 100.0) * 100
 
+# Funcion para los souvenirs
+def get_souvenirs_df(conn, subcat_id=None):
+    """
+    Trae productos cuya categoría de producto es 'Souvenir'
+    Si se pasa subcat_id, filtra por esa subcategoría.
+    """
+    base_query = """
+        SELECT
+            p.id,
+            p.nombre,
+            cp.nombre AS categoria,
+            sp.id AS subcat_id,
+            sp.nombre AS subcategoria,
+            p.precio_normalizado
+        FROM productos p
+        JOIN subcategorias_productos sp ON p.subcategoria_id = sp.id
+        JOIN categoria_productos cp ON sp.categoria_id = cp.id
+        WHERE LOWER(cp.nombre) = 'souvenir'
+    """
+    params = []
+    if subcat_id is not None:
+        base_query += " AND sp.id = %s"
+        params.append(subcat_id)
+
+    df = pd.read_sql_query(base_query, conn, params=tuple(params) if params else None)
+    return df
+
+
 
 st.set_page_config(page_title="Chokoreto App", layout="wide")
 st.sidebar.title("Menú")
@@ -71,12 +99,13 @@ seccion = st.sidebar.radio("Ir a:", [
 
 if seccion == "🛠️ ABM (Gestión de Datos)":
     st.title("🛠️ ABM – Gestión de Datos")
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "Materias Primas",
         "Categorías de MP",
         "Categorías de Productos",
         "Productos",
-        "Ingredientes x Producto"
+        "Ingredientes x Producto",
+        "Souvenirs"
     ])
     with tab1:
         # 🧱 MATERIAS PRIMAS (ABM)
@@ -939,6 +968,74 @@ if seccion == "🛠️ ABM (Gestión de Datos)":
             else:
                 st.warning("Esta categoría no tiene subcategorías.")
 
+    with tab6:
+        st.title("🎁 Souvenirs – tabla por cantidades")
+
+        # 1) Traigo todos los souvenirs
+        df_all_souv = get_souvenirs_df(conn)
+
+        if df_all_souv.empty:
+            st.info("No hay productos en la categoría 'Souvenir'. Cargá primero los productos y volvé acá.")
+        else:
+            # 2) Armar selector de subcategoría
+            subcats = df_all_souv[["subcat_id", "subcategoria"]].drop_duplicates().sort_values("subcategoria")
+            opciones_subcat = ["(todas)"] + subcats["subcategoria"].tolist()
+            subcat_sel = st.selectbox("Filtrar por subcategoría", opciones_subcat, index=0)
+
+            if subcat_sel == "(todas)":
+                df_souv = df_all_souv.copy()
+                subcat_id_sel = None
+            else:
+                # busco el id correspondiente
+                subcat_id_sel = subcats[subcats["subcategoria"] == subcat_sel]["subcat_id"].iloc[0]
+                df_souv = get_souvenirs_df(conn, subcat_id=subcat_id_sel)
+
+            st.subheader("Configuración")
+            cantidades_default = [10, 20, 30, 40, 50, 100]
+            cantidades = st.multiselect(
+                "Cantidades a mostrar",
+                options=cantidades_default,
+                default=[10, 20, 50]
+            )
+
+            descuento_pct = st.number_input(
+                "Descuento % (se aplica a TODAS las columnas)",
+                min_value=0.0,
+                max_value=100.0,
+                value=0.0,
+                step=1.0
+            )
+            factor_descuento = 1 - (descuento_pct / 100.0)
+
+            # 3) Construyo la tabla final
+            filas = []
+            for _, row in df_souv.iterrows():
+                precio_unit = float(row["precio_normalizado"] or 0)
+                fila = {
+                    "Producto": row["nombre"],
+                    "Subcategoría": row["subcategoria"],
+                    "Precio unit. base": round(precio_unit, 2)
+                }
+                for cant in cantidades:
+                    total_sin_desc = precio_unit * cant
+                    total_con_desc = total_sin_desc * factor_descuento
+                    fila[f"x{cant}"] = round(total_con_desc, 2)
+                filas.append(fila)
+
+            if filas:
+                tabla = pd.DataFrame(filas)
+                st.dataframe(tabla, use_container_width=True)
+
+                # 4) Descargar
+                csv = tabla.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    label="⬇️ Descargar CSV",
+                    data=csv,
+                    file_name="souvenirs_cantidades.csv",
+                    mime="text/csv"
+                )
+            else:
+                st.info("No hay souvenirs para mostrar con ese filtro.")
 
 
 
