@@ -75,7 +75,7 @@ def get_souvenirs_df(conn, subcat_id=None):
     params = []
     if subcat_id is not None:
         base_query += " AND sp.id = %s"
-        params.append(subcat_id)
+        params.append(int(subcat_id))
 
     df = pd.read_sql_query(base_query, conn, params=tuple(params) if params else None)
     return df
