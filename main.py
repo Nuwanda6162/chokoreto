@@ -1718,7 +1718,7 @@ elif seccion == "📉 Reportes":
                 df_souv = df_all_souv.copy()
                 subcat_id_sel = None
             else:
-                subcat_id_sel = subcats[subcats["subcategoria"] == subcat_sel]["subcat_id"].iloc[0]
+                subcat_id_sel = int(subcats[subcats["subcategoria"] == subcat_sel]["subcat_id"].iloc[0])
                 df_souv = get_souvenirs_df(conn, subcat_id=subcat_id_sel)
 
             st.subheader("Configuración")
