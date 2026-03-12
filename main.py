@@ -147,8 +147,14 @@ def buscar_materia_prima_por_texto(conn, texto_buscado):
             "con", "para", "por", "x"
         }
 
-        toks = [t for t in txt.split() if t and t not in stopwords]
-        return toks
+        return [t for t in txt.split() if t and t not in stopwords]
+
+    # Tokens que en tu dominio suelen ser importantes
+    tokens_fuertes = {
+        "callebaut", "fenix", "malchoc",
+        "gold", "blanco", "semi", "amargo", "leche",
+        "w2", "811", "54", "60", "70", "80", "90"
+    }
 
     query_tokens = tokens_limpios(texto_buscado)
     if not query_tokens:
@@ -168,42 +174,49 @@ def buscar_materia_prima_por_texto(conn, texto_buscado):
 
         score = 0
         matches = 0
+        strong_matches = 0
 
         for tok in query_tokens:
             if tok in nombre_tokens:
                 matches += 1
                 score += 10
+                if tok in tokens_fuertes:
+                    score += 12
+                    strong_matches += 1
             elif tok in nombre:
                 matches += 1
                 score += 6
+                if tok in tokens_fuertes:
+                    score += 8
+                    strong_matches += 1
 
-        # Bonus si están TODOS los tokens
+        # Bonus fuerte si están TODOS los tokens
         if matches == len(query_tokens):
+            score += 35
+
+        # Bonus extra si todos los tokens fuertes del usuario están presentes
+        query_tokens_fuertes = [t for t in query_tokens if t in tokens_fuertes]
+        if query_tokens_fuertes and all(tok in nombre for tok in query_tokens_fuertes):
             score += 25
 
-        # Bonus por cantidad de tokens matcheados
-        score += matches * 3
+        # Bonus por cantidad de tokens encontrados
+        score += matches * 4
 
-        # Bonus si empieza parecido
-        if nombre.startswith(query_tokens[0]):
-            score += 4
+        # Bonus por tokens fuertes encontrados
+        score += strong_matches * 6
 
-        # Penalización suave por nombres demasiado largos
+        # Penalización suave por nombres larguísimos
         score -= len(nombre_tokens) * 0.3
 
         if matches > 0:
-            mejores.append((score, matches, row))
+            mejores.append((score, matches, strong_matches, row))
 
     if not mejores:
         return None
 
-    # Ordenar por:
-    # 1) mayor score
-    # 2) mayor cantidad de tokens encontrados
-    mejores.sort(key=lambda x: (x[0], x[1]), reverse=True)
-
-    return mejores[0][2]
-
+    mejores.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)
+    return mejores[0][3]
+    
 def agregar_items_desde_texto(conn, texto_usuario):
     """
     Procesa una línea tipo:
