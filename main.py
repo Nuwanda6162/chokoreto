@@ -80,6 +80,127 @@ def get_souvenirs_df(conn, subcat_id=None):
     df = pd.read_sql_query(base_query, conn, params=tuple(params) if params else None)
     return df
 
+import re
+import unicodedata
+
+
+def normalizar_texto(txt):
+    if txt is None:
+        return ""
+    txt = str(txt).strip().lower()
+    txt = unicodedata.normalize("NFKD", txt).encode("ascii", "ignore").decode("utf-8")
+    txt = re.sub(r"\s+", " ", txt)
+    return txt
+
+
+def extraer_cantidad_y_nombre(fragmento):
+    """
+    Recibe algo como:
+    - '200 g chocolate blanco callebaut'
+    - '1 moño'
+    - 'etiqueta'
+
+    Devuelve:
+    cantidad, unidad_texto, nombre_buscado
+    """
+    frag = normalizar_texto(fragmento)
+
+    # Caso: "200 g chocolate blanco"
+    m = re.match(r"^(\d+(?:[\.,]\d+)?)\s*([a-zA-Z]+)\s+(.+)$", frag)
+    if m:
+        cantidad = float(m.group(1).replace(",", "."))
+        unidad = m.group(2).strip()
+        nombre = m.group(3).strip()
+        return cantidad, unidad, nombre
+
+    # Caso: "1 moño"
+    m = re.match(r"^(\d+(?:[\.,]\d+)?)\s+(.+)$", frag)
+    if m:
+        cantidad = float(m.group(1).replace(",", "."))
+        nombre = m.group(2).strip()
+        return cantidad, None, nombre
+
+    # Caso: "moño"
+    return 1.0, None, frag
+
+
+def buscar_materia_prima_por_texto(conn, texto_buscado):
+    """
+    Busca la mejor coincidencia simple por nombre en materias_primas.
+    Devuelve una fila (Series) o None.
+    """
+    df_mp = pd.read_sql_query("""
+        SELECT id, nombre, unidad, precio_por_unidad
+        FROM materias_primas
+    """, conn)
+
+    if df_mp.empty:
+        return None
+
+    df_mp["nombre_norm"] = df_mp["nombre"].apply(normalizar_texto)
+    buscado = normalizar_texto(texto_buscado)
+
+    # 1) Coincidencia exacta
+    exactos = df_mp[df_mp["nombre_norm"] == buscado]
+    if not exactos.empty:
+        return exactos.iloc[0]
+
+    # 2) Coincidencia por contenido
+    contiene = df_mp[df_mp["nombre_norm"].str.contains(buscado, na=False)]
+    if not contiene.empty:
+        contiene = contiene.copy()
+        contiene["largo_nombre"] = contiene["nombre_norm"].str.len()
+        contiene = contiene.sort_values("largo_nombre")
+        return contiene.iloc[0]
+
+    # 3) Coincidencia inversa (por si el usuario puso algo más largo)
+    al_reves = df_mp[df_mp["nombre_norm"].apply(lambda x: x in buscado if x else False)]
+    if not al_reves.empty:
+        al_reves = al_reves.copy()
+        al_reves["largo_nombre"] = al_reves["nombre_norm"].str.len()
+        al_reves = al_reves.sort_values("largo_nombre", ascending=False)
+        return al_reves.iloc[0]
+
+    return None
+
+
+def agregar_items_desde_texto(conn, texto_usuario):
+    """
+    Procesa una línea tipo:
+    'caja 4x4 + 200 g chocolate blanco + 1 moño + etiqueta'
+
+    Devuelve:
+    agregados: lista de dicts
+    no_encontrados: lista de strings
+    """
+    partes = [p.strip() for p in texto_usuario.split("+") if p.strip()]
+    agregados = []
+    no_encontrados = []
+
+    for parte in partes:
+        cantidad, unidad_texto, nombre_buscado = extraer_cantidad_y_nombre(parte)
+        mp_row = buscar_materia_prima_por_texto(conn, nombre_buscado)
+
+        if mp_row is None:
+            no_encontrados.append(parte)
+            continue
+
+        precio_por_unidad = float(mp_row["precio_por_unidad"])
+        unidad_real = mp_row["unidad"]
+        nombre_real = mp_row["nombre"]
+
+        item = {
+            "id": int(mp_row["id"]),
+            "nombre": nombre_real,
+            "unidad": unidad_real,
+            "cantidad_usada": float(cantidad),
+            "precio_por_unidad": precio_por_unidad,
+            "costo": round(float(cantidad) * precio_por_unidad, 2)
+        }
+
+        agregados.append(item)
+
+    return agregados, no_encontrados
 
 
 st.set_page_config(page_title="Chokoreto App", layout="wide")
@@ -1792,6 +1913,52 @@ elif seccion == "🧪 Simulador de productos":
     st.title("🧪 Simulador de costo y precio de producto")
     
     st.info("💡 *Usá este simulador para experimentar con recetas, ver cuánto costaría un producto nuevo o ajustar una receta existente. Agregá ingredientes, modificá cantidades y márgenes. **Nada se guarda**: es solo para probar.*")
+
+    st.subheader("Carga rápida por texto")
+    st.caption("Ejemplo: caja 4x4 + 200 g chocolate blanco callebaut + 1 moño + 1 etiqueta")
+
+    texto_rapido = st.text_area(
+        "Escribí los componentes separados por +",
+        key="sim_texto_rapido",
+        height=100
+    )
+
+    if st.button("Cargar ingredientes desde texto"):
+        if not texto_rapido.strip():
+            st.warning("Escribí algo para procesar.")
+        else:
+            agregados, no_encontrados = agregar_items_desde_texto(conn, texto_rapido)
+
+            if "simulador_ingredientes" not in st.session_state:
+                st.session_state["simulador_ingredientes"] = []
+
+            for nuevo in agregados:
+                repetido = False
+                for ing in st.session_state["simulador_ingredientes"]:
+                    if ing["nombre"] == nuevo["nombre"]:
+                        ing["cantidad_usada"] += nuevo["cantidad_usada"]
+                        ing["costo"] = round(ing["cantidad_usada"] * ing["precio_por_unidad"], 2)
+                        repetido = True
+                        break
+
+                if not repetido:
+                    st.session_state["simulador_ingredientes"].append({
+                        "nombre": nuevo["nombre"],
+                        "unidad": nuevo["unidad"],
+                        "cantidad_usada": nuevo["cantidad_usada"],
+                        "precio_por_unidad": nuevo["precio_por_unidad"],
+                        "costo": nuevo["costo"]
+                    })
+
+            if agregados:
+                st.success(f"Se agregaron {len(agregados)} ingrediente(s) a la simulación.")
+
+            if no_encontrados:
+                st.warning("No encontré estos ítems en materias_primas:")
+                for x in no_encontrados:
+                    st.write(f"- {x}")
+
+            st.rerun()
     
     if "simulador_ingredientes" not in st.session_state:
         st.session_state["simulador_ingredientes"] = []
