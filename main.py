@@ -124,18 +124,14 @@ def extraer_cantidad_y_nombre(fragmento):
     return 1.0, None, frag
 
 
-def buscar_materia_prima_por_texto(conn, texto_buscado):
-    """
-    Busca la mejor coincidencia por score de tokens.
-    Devuelve una fila (Series) o None.
-    """
+def buscar_materia_prima_por_texto(conn, texto_buscado, debug=False):
     df_mp = pd.read_sql_query("""
         SELECT id, nombre, unidad, precio_por_unidad
         FROM materias_primas
     """, conn)
 
     if df_mp.empty:
-        return None
+        return None if not debug else (None, [])
 
     def tokens_limpios(txt):
         txt = normalizar_texto(txt)
@@ -149,7 +145,6 @@ def buscar_materia_prima_por_texto(conn, texto_buscado):
 
         return [t for t in txt.split() if t and t not in stopwords]
 
-    # Tokens que en tu dominio suelen ser importantes
     tokens_fuertes = {
         "callebaut", "fenix", "malchoc",
         "gold", "blanco", "semi", "amargo", "leche",
@@ -158,7 +153,7 @@ def buscar_materia_prima_por_texto(conn, texto_buscado):
 
     query_tokens = tokens_limpios(texto_buscado)
     if not query_tokens:
-        return None
+        return None if not debug else (None, [])
 
     df_mp = df_mp.copy()
     df_mp["nombre_norm"] = df_mp["nombre"].apply(normalizar_texto)
@@ -190,32 +185,42 @@ def buscar_materia_prima_por_texto(conn, texto_buscado):
                     score += 8
                     strong_matches += 1
 
-        # Bonus fuerte si están TODOS los tokens
         if matches == len(query_tokens):
             score += 35
 
-        # Bonus extra si todos los tokens fuertes del usuario están presentes
         query_tokens_fuertes = [t for t in query_tokens if t in tokens_fuertes]
         if query_tokens_fuertes and all(tok in nombre for tok in query_tokens_fuertes):
             score += 25
 
-        # Bonus por cantidad de tokens encontrados
         score += matches * 4
-
-        # Bonus por tokens fuertes encontrados
         score += strong_matches * 6
-
-        # Penalización suave por nombres larguísimos
         score -= len(nombre_tokens) * 0.3
 
         if matches > 0:
-            mejores.append((score, matches, strong_matches, row))
+            mejores.append({
+                "nombre": row["nombre"],
+                "score": round(score, 2),
+                "matches": matches,
+                "strong_matches": strong_matches,
+                "nombre_tokens": nombre_tokens
+            })
 
     if not mejores:
-        return None
+        return None if not debug else (None, [])
 
-    mejores.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)
-    return mejores[0][3]
+    mejores = sorted(
+        mejores,
+        key=lambda x: (x["score"], x["matches"], x["strong_matches"]),
+        reverse=True
+    )
+
+    elegido_nombre = mejores[0]["nombre"]
+    elegido = df_mp[df_mp["nombre"] == elegido_nombre].iloc[0]
+
+    if debug:
+        return elegido, mejores[:10]
+
+    return elegido
     
 def agregar_items_desde_texto(conn, texto_usuario):
     """
@@ -1981,7 +1986,7 @@ elif seccion == "🧪 Simulador de productos":
         st.write("Unidad detectada:", unidad_dbg)
         st.write("Nombre buscado:", nombre_dbg)
     
-        mp_dbg = buscar_materia_prima_por_texto(conn, nombre_dbg)
+        mp_dbg, top_dbg = buscar_materia_prima_por_texto(conn, nombre_dbg, debug=True)
     
         if mp_dbg is None:
             st.write("Resultado: None")
@@ -1993,6 +1998,9 @@ elif seccion == "🧪 Simulador de productos":
                 "unidad": mp_dbg["unidad"],
                 "precio_por_unidad": float(mp_dbg["precio_por_unidad"])
             })
+    
+        st.write("Top candidatos:")
+        st.dataframe(pd.DataFrame(top_dbg))
     if st.button("Cargar ingredientes desde texto"):
         if not texto_rapido.strip():
             st.warning("Escribí algo para procesar.")
