@@ -1975,7 +1975,24 @@ elif seccion == "🧪 Simulador de productos":
         key="sim_texto_rapido",
         height=100
     )
-
+    if st.button("DEBUG buscar MP"):
+        cantidad_dbg, unidad_dbg, nombre_dbg = extraer_cantidad_y_nombre(texto_rapido)
+        st.write("Cantidad detectada:", cantidad_dbg)
+        st.write("Unidad detectada:", unidad_dbg)
+        st.write("Nombre buscado:", nombre_dbg)
+    
+        mp_dbg = buscar_materia_prima_por_texto(conn, nombre_dbg)
+    
+        if mp_dbg is None:
+            st.write("Resultado: None")
+        else:
+            st.write("Resultado encontrado:")
+            st.write({
+                "id": int(mp_dbg["id"]),
+                "nombre": mp_dbg["nombre"],
+                "unidad": mp_dbg["unidad"],
+                "precio_por_unidad": float(mp_dbg["precio_por_unidad"])
+            })
     if st.button("Cargar ingredientes desde texto"):
         if not texto_rapido.strip():
             st.warning("Escribí algo para procesar.")
