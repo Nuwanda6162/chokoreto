@@ -99,19 +99,33 @@ def extraer_cantidad_y_nombre(fragmento):
     - '200 g chocolate blanco callebaut'
     - '1 moño'
     - 'etiqueta'
+    - '50 callebaut blanco'
 
     Devuelve:
     cantidad, unidad_texto, nombre_buscado
     """
     frag = normalizar_texto(fragmento)
 
+    unidades_validas = {
+        "g", "gr", "gramo", "gramos",
+        "kg", "kilo", "kilos",
+        "ml", "cc", "l", "lt", "litro", "litros",
+        "u", "un", "uni", "unidad", "unidades"
+    }
+
     # Caso: "200 g chocolate blanco"
     m = re.match(r"^(\d+(?:[\.,]\d+)?)\s*([a-zA-Z]+)\s+(.+)$", frag)
     if m:
         cantidad = float(m.group(1).replace(",", "."))
-        unidad = m.group(2).strip()
-        nombre = m.group(3).strip()
-        return cantidad, unidad, nombre
+        posible_unidad = m.group(2).strip()
+        resto = m.group(3).strip()
+
+        if posible_unidad in unidades_validas:
+            return cantidad, posible_unidad, resto
+        else:
+            # No era unidad real: forma parte del nombre
+            nombre = f"{posible_unidad} {resto}".strip()
+            return cantidad, None, nombre
 
     # Caso: "1 moño"
     m = re.match(r"^(\d+(?:[\.,]\d+)?)\s+(.+)$", frag)
@@ -122,7 +136,6 @@ def extraer_cantidad_y_nombre(fragmento):
 
     # Caso: "moño"
     return 1.0, None, frag
-
 
 def buscar_materia_prima_por_texto(conn, texto_buscado, debug=False):
     df_mp = pd.read_sql_query("""
