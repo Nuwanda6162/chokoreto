@@ -126,7 +126,7 @@ def extraer_cantidad_y_nombre(fragmento):
 
 def buscar_materia_prima_por_texto(conn, texto_buscado):
     """
-    Busca la mejor coincidencia simple por nombre en materias_primas.
+    Busca la mejor coincidencia por score de tokens.
     Devuelve una fila (Series) o None.
     """
     df_mp = pd.read_sql_query("""
@@ -137,32 +137,72 @@ def buscar_materia_prima_por_texto(conn, texto_buscado):
     if df_mp.empty:
         return None
 
+    def tokens_limpios(txt):
+        txt = normalizar_texto(txt)
+        txt = txt.replace("%", " ")
+        txt = re.sub(r"[^a-z0-9\s]", " ", txt)
+
+        stopwords = {
+            "chocolate", "cobertura", "cacao", "de", "del", "la", "el",
+            "con", "para", "por", "x"
+        }
+
+        toks = [t for t in txt.split() if t and t not in stopwords]
+        return toks
+
+    query_tokens = tokens_limpios(texto_buscado)
+    if not query_tokens:
+        return None
+
+    df_mp = df_mp.copy()
     df_mp["nombre_norm"] = df_mp["nombre"].apply(normalizar_texto)
-    buscado = normalizar_texto(texto_buscado)
 
-    # 1) Coincidencia exacta
-    exactos = df_mp[df_mp["nombre_norm"] == buscado]
-    if not exactos.empty:
-        return exactos.iloc[0]
+    mejores = []
 
-    # 2) Coincidencia por contenido
-    contiene = df_mp[df_mp["nombre_norm"].str.contains(buscado, na=False)]
-    if not contiene.empty:
-        contiene = contiene.copy()
-        contiene["largo_nombre"] = contiene["nombre_norm"].str.len()
-        contiene = contiene.sort_values("largo_nombre")
-        return contiene.iloc[0]
+    for _, row in df_mp.iterrows():
+        nombre = row["nombre_norm"]
+        nombre_tokens = tokens_limpios(nombre)
 
-    # 3) Coincidencia inversa (por si el usuario puso algo más largo)
-    al_reves = df_mp[df_mp["nombre_norm"].apply(lambda x: x in buscado if x else False)]
-    if not al_reves.empty:
-        al_reves = al_reves.copy()
-        al_reves["largo_nombre"] = al_reves["nombre_norm"].str.len()
-        al_reves = al_reves.sort_values("largo_nombre", ascending=False)
-        return al_reves.iloc[0]
+        if not nombre_tokens:
+            continue
 
-    return None
+        score = 0
+        matches = 0
 
+        for tok in query_tokens:
+            if tok in nombre_tokens:
+                matches += 1
+                score += 10
+            elif tok in nombre:
+                matches += 1
+                score += 6
+
+        # Bonus si están TODOS los tokens
+        if matches == len(query_tokens):
+            score += 25
+
+        # Bonus por cantidad de tokens matcheados
+        score += matches * 3
+
+        # Bonus si empieza parecido
+        if nombre.startswith(query_tokens[0]):
+            score += 4
+
+        # Penalización suave por nombres demasiado largos
+        score -= len(nombre_tokens) * 0.3
+
+        if matches > 0:
+            mejores.append((score, matches, row))
+
+    if not mejores:
+        return None
+
+    # Ordenar por:
+    # 1) mayor score
+    # 2) mayor cantidad de tokens encontrados
+    mejores.sort(key=lambda x: (x[0], x[1]), reverse=True)
+
+    return mejores[0][2]
 
 def agregar_items_desde_texto(conn, texto_usuario):
     """
